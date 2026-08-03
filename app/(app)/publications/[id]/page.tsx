@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase/client';
 import { Button } from '@/components/common/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/common/Card';
 import { PublicationStatusBadge } from '@/components/publications/StatusBadge';
@@ -21,6 +20,7 @@ export default function PublicationDetailsPage({ params }: { params: { id: strin
 
   const fetchData = async () => {
     try {
+      const { supabase } = await import('@/lib/supabase/client');
       const { data: pubData } = await supabase
         .from('publication_queue')
         .select('*')

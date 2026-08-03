@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
@@ -35,6 +34,7 @@ export default function SignupPage() {
     }
 
     try {
+      const { supabase } = await import('@/lib/supabase/client');
       const { error: signUpError, data } = await supabase.auth.signUp({
         email,
         password,

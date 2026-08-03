@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase/client';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
@@ -18,6 +17,7 @@ export default function ProfilePage() {
 
   const fetchUser = async () => {
     try {
+      const { supabase } = await import('@/lib/supabase/client');
       const {
         data: { session },
       } = await supabase.auth.getSession();

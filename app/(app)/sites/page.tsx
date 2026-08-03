@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase/client';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Button } from '@/components/common/Button';
 import { Card, CardContent } from '@/components/common/Card';
@@ -30,6 +29,7 @@ export default function SitesPage() {
 
   const fetchSites = async () => {
     try {
+      const { supabase } = await import('@/lib/supabase/client');
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -64,6 +64,7 @@ export default function SitesPage() {
     if (!confirm('Tem certeza que deseja deletar este site?')) return;
 
     try {
+      const { supabase } = await import('@/lib/supabase/client');
       await supabase.from('sites').delete().eq('id', siteId);
       fetchSites();
     } catch (error) {

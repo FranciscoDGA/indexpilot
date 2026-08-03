@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase/client';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card, CardContent, CardTitle } from '@/components/common/Card';
 import type { DashboardMetrics, PublicationQueue } from '@/types';
@@ -21,6 +20,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchMetrics = async () => {
       try {
+        const { supabase } = await import('@/lib/supabase/client');
         const {
           data: { session },
         } = await supabase.auth.getSession();

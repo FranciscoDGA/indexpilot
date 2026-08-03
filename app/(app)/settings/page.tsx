@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase/client';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
@@ -27,6 +26,7 @@ export default function SettingsPage() {
 
   const fetchUser = async () => {
     try {
+      const { supabase } = await import('@/lib/supabase/client');
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -62,6 +62,7 @@ export default function SettingsPage() {
     setMessage(null);
 
     try {
+      const { supabase } = await import('@/lib/supabase/client');
       await supabase
         .from('users')
         .update({

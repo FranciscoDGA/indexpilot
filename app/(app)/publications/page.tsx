@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase/client';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Input } from '@/components/common/Input';
 import { Card, CardContent } from '@/components/common/Card';
@@ -37,6 +36,7 @@ export default function PublicationsPage() {
 
   const fetchData = async () => {
     try {
+      const { supabase } = await import('@/lib/supabase/client');
       const {
         data: { session },
       } = await supabase.auth.getSession();

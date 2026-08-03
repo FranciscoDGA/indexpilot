@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase/client';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { TopBar } from '@/components/layout/TopBar';
 import type { User } from '@/types';
@@ -15,6 +14,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const getUser = async () => {
       try {
+        // Dynamic import to avoid build-time issues
+        const { supabase } = await import('@/lib/supabase/client');
+
         const {
           data: { session },
         } = await supabase.auth.getSession();

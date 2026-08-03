@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase/client';
 import { Button } from '@/components/common/Button';
 import type { User } from '@/types';
 
@@ -11,6 +10,7 @@ export function TopBar({ user }: { user: User | null }) {
   const [showMenu, setShowMenu] = useState(false);
 
   const handleLogout = async () => {
+    const { supabase } = await import('@/lib/supabase/client');
     await supabase.auth.signOut();
     router.push('/login');
   };

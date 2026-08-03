@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase/client';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Button } from '@/components/common/Button';
 import { Card, CardContent } from '@/components/common/Card';
@@ -36,6 +35,7 @@ export default function SiteDashboardPage({ params }: { params: { id: string } }
 
   const fetchData = async () => {
     try {
+      const { supabase } = await import('@/lib/supabase/client');
       // Fetch site
       const { data: siteData } = await supabase
         .from('sites')

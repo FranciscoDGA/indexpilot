@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase/client';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Button } from '@/components/common/Button';
 import { Card, CardContent } from '@/components/common/Card';
@@ -37,6 +36,7 @@ export default function ApiKeysPage() {
 
   const fetchSites = async () => {
     try {
+      const { supabase } = await import('@/lib/supabase/client');
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -60,6 +60,7 @@ export default function ApiKeysPage() {
   const fetchApiKeys = async (siteId: string) => {
     try {
       setLoading(true);
+      const { supabase } = await import('@/lib/supabase/client');
       const { data } = await supabase
         .from('api_keys')
         .select('*')
@@ -76,6 +77,7 @@ export default function ApiKeysPage() {
 
   const handleCreateKey = async (name: string, type: 'live' | 'test') => {
     try {
+      const { supabase } = await import('@/lib/supabase/client');
       const key = generateApiKey(type);
       const hashedKey = hashApiKey(key);
 
@@ -100,6 +102,7 @@ export default function ApiKeysPage() {
     if (!confirm('Tem certeza que deseja revogar esta chave?')) return;
 
     try {
+      const { supabase } = await import('@/lib/supabase/client');
       await supabase.from('api_keys').delete().eq('id', keyId);
       await fetchApiKeys(selectedSite);
     } catch (error) {
