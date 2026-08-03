@@ -1,32 +1,28 @@
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  const res = NextResponse.next();
-  const supabase = createMiddlewareClient({ req: request, res });
+  const { pathname } = request.nextUrl;
 
-  const { data: { session } } = await supabase.auth.getSession();
+  // Get session from cookie
+  const sessionCookie = request.cookies.get('sb-access-token');
+  const hasSession = !!sessionCookie;
 
   // Redirect to login if trying to access protected routes without session
-  if (!session) {
-    const { pathname } = request.nextUrl;
-
+  if (!hasSession) {
     if (pathname.startsWith('/app') || pathname.startsWith('/dashboard')) {
-      return NextResponse.redirect(new URL('/auth/login', request.url));
+      return NextResponse.redirect(new URL('/login', request.url));
     }
   }
 
   // Redirect to dashboard if already logged in and trying to access auth pages
-  if (session) {
-    const { pathname } = request.nextUrl;
-
-    if (pathname === '/auth/login' || pathname === '/auth/signup') {
+  if (hasSession) {
+    if (pathname === '/login' || pathname === '/signup') {
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }
   }
 
-  return res;
+  return NextResponse.next();
 }
 
 export const config = {
