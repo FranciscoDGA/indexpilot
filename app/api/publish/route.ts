@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import { validatePublishRequest, extractDomain } from '@/lib/api/validation';
 import { verifyApiKey, hashApiKey, updateApiKeyLastUsed } from '@/lib/api/apiKey';
 import { createPublication, createPublicationLog, createPublicationEvent } from '@/lib/api/publication';
