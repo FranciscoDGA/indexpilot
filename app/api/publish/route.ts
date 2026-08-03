@@ -102,13 +102,6 @@ export async function POST(request: NextRequest): Promise<NextResponse<PublishRe
     // Verify API key
     const keyVerification = await verifyApiKey(apiKey, domain);
     if (!keyVerification.valid) {
-      await createPublicationLog(
-        'unknown',
-        `Failed API key verification: ${keyVerification.error}`,
-        'error',
-        { ip: clientIp }
-      );
-
       return NextResponse.json(
         {
           success: false,

@@ -1,6 +1,5 @@
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import { v4 as uuidv4 } from 'uuid';
+import { createClient } from './supabaseServer';
 import { PublishRequest } from './validation';
 
 export async function createPublication(
@@ -14,8 +13,7 @@ export async function createPublication(
   code?: string;
 }> {
   try {
-    const cookieStore = cookies();
-    const supabase = createServerComponentClient({ cookies: () => cookieStore });
+    const supabase = createClient();
 
     // Check for duplicates
     const { data: existing, error: checkError } = await supabase
@@ -86,8 +84,7 @@ export async function createPublicationLog(
   metadata?: Record<string, any>
 ): Promise<void> {
   try {
-    const cookieStore = cookies();
-    const supabase = createServerComponentClient({ cookies: () => cookieStore });
+    const supabase = createClient();
 
     await supabase.from('publication_logs').insert([
       {
@@ -109,8 +106,7 @@ export async function createPublicationEvent(
   metadata?: Record<string, any>
 ): Promise<void> {
   try {
-    const cookieStore = cookies();
-    const supabase = createServerComponentClient({ cookies: () => cookieStore });
+    const supabase = createClient();
 
     await supabase.from('publication_events').insert([
       {

@@ -1,6 +1,5 @@
 import crypto from 'crypto';
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { createClient } from './supabaseServer';
 
 // Generate API Key
 export function generateApiKey(type: 'live' | 'test'): string {
@@ -25,8 +24,7 @@ export async function verifyApiKey(
 }> {
   try {
     const hashedKey = hashApiKey(key);
-    const cookieStore = cookies();
-    const supabase = createServerComponentClient({ cookies: () => cookieStore });
+    const supabase = createClient();
 
     // Find API key
     const { data: apiKey, error: keyError } = await supabase
@@ -59,15 +57,13 @@ export async function updateApiKeyLastUsed(
   ip: string
 ): Promise<void> {
   try {
-    const cookieStore = cookies();
-    const supabase = createServerComponentClient({ cookies: () => cookieStore });
+    const supabase = createClient();
 
     await supabase
       .from('api_keys')
       .update({
         last_used_at: new Date().toISOString(),
         last_used_ip: ip,
-        publications_count: supabase.rpc('increment_publications_count', { key_hash: keyHash }),
       })
       .eq('key_hash', keyHash);
   } catch (error) {
