@@ -450,3 +450,172 @@ CREATE TRIGGER update_seo_audits_updated_at
     BEFORE UPDATE ON seo_audits
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- SEARCH_PERFORMANCE TABLE (Sprint 07)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS search_performance (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    publication_id UUID NOT NULL REFERENCES publication_queue(id) ON DELETE CASCADE,
+    site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+    date DATE NOT NULL,
+
+    impressions INTEGER DEFAULT 0,
+    clicks INTEGER DEFAULT 0,
+    ctr DECIMAL(5, 2) DEFAULT 0,
+    avg_position DECIMAL(5, 2) DEFAULT 0,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(publication_id, date)
+);
+
+CREATE INDEX idx_search_performance_publication_id ON search_performance(publication_id);
+CREATE INDEX idx_search_performance_site_id ON search_performance(site_id);
+CREATE INDEX idx_search_performance_date ON search_performance(site_id, date DESC);
+CREATE INDEX idx_search_performance_created_at ON search_performance(publication_id, created_at DESC);
+
+-- ============================================
+-- KEYWORD_PERFORMANCE TABLE (Sprint 07)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS keyword_performance (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    publication_id UUID NOT NULL REFERENCES publication_queue(id) ON DELETE CASCADE,
+    site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+    keyword VARCHAR(500) NOT NULL,
+    date DATE NOT NULL,
+
+    impressions INTEGER DEFAULT 0,
+    clicks INTEGER DEFAULT 0,
+    ctr DECIMAL(5, 2) DEFAULT 0,
+    position DECIMAL(5, 2) DEFAULT 0,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(publication_id, keyword, date)
+);
+
+CREATE INDEX idx_keyword_performance_publication_id ON keyword_performance(publication_id);
+CREATE INDEX idx_keyword_performance_site_id ON keyword_performance(site_id);
+CREATE INDEX idx_keyword_performance_keyword ON keyword_performance(site_id, keyword);
+CREATE INDEX idx_keyword_performance_date ON keyword_performance(site_id, date DESC);
+
+-- ============================================
+-- PERFORMANCE_MILESTONES TABLE (Sprint 07)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS performance_milestones (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    publication_id UUID NOT NULL REFERENCES publication_queue(id) ON DELETE CASCADE,
+    site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+    milestone_type VARCHAR(50) NOT NULL,
+    milestone_date TIMESTAMP WITH TIME ZONE NOT NULL,
+
+    keyword VARCHAR(500),
+    previous_value DECIMAL(10, 2),
+    new_value DECIMAL(10, 2),
+
+    metadata JSONB,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_performance_milestones_publication_id ON performance_milestones(publication_id);
+CREATE INDEX idx_performance_milestones_site_id ON performance_milestones(site_id);
+CREATE INDEX idx_performance_milestones_type ON performance_milestones(site_id, milestone_type);
+CREATE INDEX idx_performance_milestones_date ON performance_milestones(milestone_date DESC);
+
+-- ============================================
+-- GSC_IMPORTS TABLE (Sprint 07)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS gsc_imports (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+    import_type VARCHAR(50) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed', 'error')),
+
+    start_date DATE,
+    end_date DATE,
+
+    records_imported INTEGER DEFAULT 0,
+    error_message TEXT,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    completed_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX idx_gsc_imports_site_id ON gsc_imports(site_id);
+CREATE INDEX idx_gsc_imports_status ON gsc_imports(site_id, status);
+CREATE INDEX idx_gsc_imports_created_at ON gsc_imports(site_id, created_at DESC);
+
+-- ============================================
+-- ENABLE RLS FOR SPRINT 07 TABLES
+-- ============================================
+
+ALTER TABLE search_performance ENABLE ROW LEVEL SECURITY;
+ALTER TABLE keyword_performance ENABLE ROW LEVEL SECURITY;
+ALTER TABLE performance_milestones ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gsc_imports ENABLE ROW LEVEL SECURITY;
+
+-- Search Performance: Users can only access data for their sites
+CREATE POLICY "Users can view own search performance"
+    ON search_performance FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own search performance"
+    ON search_performance FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own search performance"
+    ON search_performance FOR UPDATE
+    USING (auth.uid() = user_id);
+
+-- Keyword Performance: Users can only access keywords for their publications
+CREATE POLICY "Users can view own keyword performance"
+    ON keyword_performance FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own keyword performance"
+    ON keyword_performance FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+-- Performance Milestones: Users can only access milestones for their sites
+CREATE POLICY "Users can view own performance milestones"
+    ON performance_milestones FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own performance milestones"
+    ON performance_milestones FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+-- GSC Imports: Users can only access imports for their sites
+CREATE POLICY "Users can view own gsc imports"
+    ON gsc_imports FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own gsc imports"
+    ON gsc_imports FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own gsc imports"
+    ON gsc_imports FOR UPDATE
+    USING (auth.uid() = user_id);
+
+-- ============================================
+-- TRIGGERS FOR SPRINT 07 TABLES
+-- ============================================
+
+CREATE TRIGGER update_search_performance_updated_at
+    BEFORE UPDATE ON search_performance
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();

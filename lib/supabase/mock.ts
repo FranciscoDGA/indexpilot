@@ -327,6 +327,119 @@ const mockSeoAuditHistory = [
   },
 ];
 
+// Sprint 07 - Google Search Console Mock Data
+const mockSearchPerformance = [
+  {
+    id: 'perf-1',
+    publication_id: 'pub-1',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    impressions: 1250,
+    clicks: 85,
+    ctr: 6.8,
+    avg_position: 4.2,
+    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'perf-2',
+    publication_id: 'pub-1',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    impressions: 1420,
+    clicks: 98,
+    ctr: 6.9,
+    avg_position: 3.8,
+    created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    updated_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'perf-3',
+    publication_id: 'pub-2',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    impressions: 856,
+    clicks: 42,
+    ctr: 4.9,
+    avg_position: 8.5,
+    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+];
+
+const mockKeywordPerformance = [
+  {
+    id: 'kw-1',
+    publication_id: 'pub-1',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    keyword: 'React 19 features',
+    date: new Date().toISOString().split('T')[0],
+    impressions: 520,
+    clicks: 42,
+    ctr: 8.1,
+    position: 2,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'kw-2',
+    publication_id: 'pub-1',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    keyword: 'React tutorial',
+    date: new Date().toISOString().split('T')[0],
+    impressions: 380,
+    clicks: 28,
+    ctr: 7.4,
+    position: 5,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'kw-3',
+    publication_id: 'pub-1',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    keyword: 'JavaScript performance',
+    date: new Date().toISOString().split('T')[0],
+    impressions: 210,
+    clicks: 12,
+    ctr: 5.7,
+    position: 12,
+    created_at: new Date().toISOString(),
+  },
+];
+
+const mockPerformanceMilestones = [
+  {
+    id: 'mile-1',
+    publication_id: 'pub-1',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    milestone_type: 'entered_top_10',
+    milestone_date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    keyword: 'React 19 features',
+    previous_value: 12,
+    new_value: 8,
+    metadata: { source: 'GSC' },
+    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'mile-2',
+    publication_id: 'pub-1',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    milestone_type: 'ctr_increased',
+    milestone_date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    previous_value: 5.2,
+    new_value: 6.8,
+    metadata: { source: 'GSC' },
+    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+];
+
 type QueryBuilder = {
   eq: (field: string, value: any) => QueryBuilder;
   in: (field: string, values: any[]) => QueryBuilder;
@@ -414,6 +527,15 @@ export function createMockSupabaseClient() {
           break;
         case 'seo_audit_history':
           data = mockSeoAuditHistory;
+          break;
+        case 'search_performance':
+          data = mockSearchPerformance;
+          break;
+        case 'keyword_performance':
+          data = mockKeywordPerformance;
+          break;
+        case 'performance_milestones':
+          data = mockPerformanceMilestones;
           break;
         case 'users':
           data = [
