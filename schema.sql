@@ -559,6 +559,156 @@ CREATE INDEX idx_gsc_imports_status ON gsc_imports(site_id, status);
 CREATE INDEX idx_gsc_imports_created_at ON gsc_imports(site_id, created_at DESC);
 
 -- ============================================
+-- SPRINT 06: SITE DISCOVERY & SYNCHRONIZATION
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS urls (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    publication_id UUID REFERENCES publication_queue(id) ON DELETE SET NULL,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+    url VARCHAR(2000) NOT NULL,
+    slug VARCHAR(500),
+
+    title VARCHAR(255),
+    description TEXT,
+    last_modified TIMESTAMP WITH TIME ZONE,
+
+    source VARCHAR(20) NOT NULL CHECK (source IN ('sitemap', 'crawl', 'gsc', 'manual')),
+    discovered_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+
+    http_status INTEGER,
+    is_redirect BOOLEAN DEFAULT FALSE,
+    redirect_to VARCHAR(2000),
+
+    is_indexable BOOLEAN DEFAULT TRUE,
+    is_indexed BOOLEAN DEFAULT FALSE,
+    is_orphaned BOOLEAN DEFAULT FALSE,
+
+    last_checked TIMESTAMP WITH TIME ZONE,
+    sync_status VARCHAR(20) DEFAULT 'pending' CHECK (sync_status IN ('pending', 'synced', 'error')),
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+    UNIQUE(site_id, url)
+);
+
+CREATE INDEX idx_urls_site_id ON urls(site_id);
+CREATE INDEX idx_urls_user_id ON urls(user_id);
+CREATE INDEX idx_urls_indexed ON urls(site_id, is_indexed);
+CREATE INDEX idx_urls_orphaned ON urls(site_id, is_orphaned);
+CREATE INDEX idx_urls_status ON urls(site_id, sync_status);
+CREATE INDEX idx_urls_created_at ON urls(site_id, created_at DESC);
+CREATE INDEX idx_urls_last_checked ON urls(site_id, last_checked DESC);
+
+CREATE TABLE IF NOT EXISTS url_metadata (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    url_id UUID NOT NULL REFERENCES urls(id) ON DELETE CASCADE,
+
+    og_title VARCHAR(255),
+    og_description TEXT,
+    og_image VARCHAR(2000),
+
+    twitter_title VARCHAR(255),
+    twitter_description TEXT,
+    twitter_image VARCHAR(2000),
+
+    canonical VARCHAR(2000),
+    robots_index BOOLEAN,
+    robots_follow BOOLEAN,
+
+    viewport VARCHAR(255),
+    mobile_friendly BOOLEAN,
+
+    word_count INTEGER,
+    headings_count INTEGER,
+
+    external_links_count INTEGER,
+    internal_links_count INTEGER,
+
+    schema_types TEXT[],
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_url_metadata_url_id ON url_metadata(url_id);
+
+CREATE TABLE IF NOT EXISTS sync_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+    sync_type VARCHAR(50) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+
+    urls_found INTEGER DEFAULT 0,
+    urls_new INTEGER DEFAULT 0,
+    urls_removed INTEGER DEFAULT 0,
+    urls_updated INTEGER DEFAULT 0,
+
+    error_message TEXT,
+
+    started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    completed_at TIMESTAMP WITH TIME ZONE,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_sync_logs_site_id ON sync_logs(site_id);
+CREATE INDEX idx_sync_logs_status ON sync_logs(site_id, status);
+CREATE INDEX idx_sync_logs_created_at ON sync_logs(site_id, created_at DESC);
+
+-- ============================================
+-- ENABLE RLS FOR SPRINT 06 TABLES
+-- ============================================
+
+ALTER TABLE urls ENABLE ROW LEVEL SECURITY;
+ALTER TABLE url_metadata ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sync_logs ENABLE ROW LEVEL SECURITY;
+
+-- URLs: Users can only access URLs for their sites
+CREATE POLICY "Users can view own urls"
+    ON urls FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own urls"
+    ON urls FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own urls"
+    ON urls FOR UPDATE
+    USING (auth.uid() = user_id);
+
+-- URL Metadata: Users can access metadata for their URLs
+CREATE POLICY "Users can view own url metadata"
+    ON url_metadata FOR SELECT
+    USING (EXISTS (
+        SELECT 1 FROM urls
+        WHERE urls.id = url_metadata.url_id
+        AND urls.user_id = auth.uid()
+    ));
+
+CREATE POLICY "Users can insert own url metadata"
+    ON url_metadata FOR INSERT
+    WITH CHECK (EXISTS (
+        SELECT 1 FROM urls
+        WHERE urls.id = url_metadata.url_id
+        AND urls.user_id = auth.uid()
+    ));
+
+-- Sync Logs: Users can only access logs for their sites
+CREATE POLICY "Users can view own sync logs"
+    ON sync_logs FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own sync logs"
+    ON sync_logs FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+-- ============================================
 -- ENABLE RLS FOR SPRINT 07 TABLES
 -- ============================================
 

@@ -7,6 +7,7 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: '📊' },
   { href: '/sites', label: 'Sites', icon: '🌐' },
   { href: '/publications', label: 'Publicações', icon: '📝' },
+  { href: '/discovery', label: 'Site Discovery', icon: '🔎' },
   { href: '/seo', label: 'SEO Inspector', icon: '🔍' },
   { href: '/seo/compare', label: 'Comparar URLs', icon: '⚖️', indent: true },
   { href: '/performance', label: 'Performance', icon: '📈' },

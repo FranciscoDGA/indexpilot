@@ -440,6 +440,165 @@ const mockPerformanceMilestones = [
   },
 ];
 
+const mockUrls = [
+  {
+    id: 'url-1',
+    site_id: 'site-1',
+    publication_id: 'pub-1',
+    user_id: 'mock-user-123',
+    url: 'https://techblog.com',
+    slug: 'home',
+    title: 'Tech Blog - Home',
+    description: 'Latest tech trends and tutorials',
+    source: 'sitemap',
+    discovered_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    http_status: 200,
+    is_redirect: false,
+    is_indexable: true,
+    is_indexed: true,
+    is_orphaned: false,
+    sync_status: 'synced',
+    created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    last_checked: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'url-2',
+    site_id: 'site-1',
+    publication_id: 'pub-2',
+    user_id: 'mock-user-123',
+    url: 'https://techblog.com/react-19-released',
+    slug: 'react-19-released',
+    title: 'React 19 Released - New Features',
+    description: 'Discover all the new features in React 19',
+    source: 'sitemap',
+    discovered_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+    http_status: 200,
+    is_redirect: false,
+    is_indexable: true,
+    is_indexed: true,
+    is_orphaned: false,
+    sync_status: 'synced',
+    created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+    last_checked: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'url-3',
+    site_id: 'site-1',
+    publication_id: null,
+    user_id: 'mock-user-123',
+    url: 'https://techblog.com/about',
+    slug: 'about',
+    title: 'About Tech Blog',
+    description: 'Learn more about our blog',
+    source: 'crawl',
+    discovered_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+    http_status: 200,
+    is_redirect: false,
+    is_indexable: true,
+    is_indexed: false,
+    is_orphaned: true,
+    sync_status: 'synced',
+    created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+    last_checked: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'url-4',
+    site_id: 'site-1',
+    publication_id: null,
+    user_id: 'mock-user-123',
+    url: 'https://techblog.com/contact',
+    slug: 'contact',
+    title: 'Contact Us',
+    description: 'Get in touch with our team',
+    source: 'crawl',
+    discovered_at: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
+    http_status: 404,
+    is_redirect: false,
+    is_indexable: false,
+    is_indexed: false,
+    is_orphaned: false,
+    sync_status: 'synced',
+    created_at: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
+    last_checked: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+];
+
+const mockUrlMetadata = [
+  {
+    id: 'meta-1',
+    url_id: 'url-1',
+    og_title: 'Tech Blog - Latest Tutorials',
+    og_description: 'Learn about latest tech trends',
+    og_image: 'https://techblog.com/og-image.jpg',
+    twitter_title: 'Tech Blog',
+    twitter_image: 'https://techblog.com/twitter-image.jpg',
+    canonical: 'https://techblog.com',
+    robots_index: true,
+    robots_follow: true,
+    viewport: 'width=device-width, initial-scale=1',
+    mobile_friendly: true,
+    word_count: 2150,
+    headings_count: 4,
+    external_links_count: 12,
+    internal_links_count: 15,
+    schema_types: ['WebSite', 'Organization'],
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'meta-2',
+    url_id: 'url-2',
+    og_title: 'React 19 Released',
+    og_description: 'New features in React 19',
+    og_image: 'https://techblog.com/react19-og.jpg',
+    twitter_title: 'React 19 Released',
+    twitter_image: 'https://techblog.com/react19-tw.jpg',
+    canonical: 'https://techblog.com/react-19-released',
+    robots_index: true,
+    robots_follow: true,
+    viewport: 'width=device-width, initial-scale=1',
+    mobile_friendly: true,
+    word_count: 4230,
+    headings_count: 8,
+    external_links_count: 22,
+    internal_links_count: 8,
+    schema_types: ['BlogPosting', 'Article'],
+    created_at: new Date().toISOString(),
+  },
+];
+
+const mockSyncLogs = [
+  {
+    id: 'sync-1',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    sync_type: 'full',
+    status: 'completed',
+    urls_found: 45,
+    urls_new: 5,
+    urls_removed: 2,
+    urls_updated: 8,
+    error_message: null,
+    started_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    completed_at: new Date(Date.now() - 1.5 * 60 * 60 * 1000).toISOString(),
+    created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'sync-2',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    sync_type: 'incremental',
+    status: 'completed',
+    urls_found: 47,
+    urls_new: 2,
+    urls_removed: 0,
+    urls_updated: 3,
+    error_message: null,
+    started_at: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString(),
+    completed_at: new Date(Date.now() - 25.5 * 60 * 60 * 1000).toISOString(),
+    created_at: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString(),
+  },
+];
+
 type QueryBuilder = {
   eq: (field: string, value: any) => QueryBuilder;
   in: (field: string, values: any[]) => QueryBuilder;
@@ -536,6 +695,15 @@ export function createMockSupabaseClient() {
           break;
         case 'performance_milestones':
           data = mockPerformanceMilestones;
+          break;
+        case 'urls':
+          data = mockUrls;
+          break;
+        case 'url_metadata':
+          data = mockUrlMetadata;
+          break;
+        case 'sync_logs':
+          data = mockSyncLogs;
           break;
         case 'users':
           data = [

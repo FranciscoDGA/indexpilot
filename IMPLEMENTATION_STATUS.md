@@ -4,9 +4,10 @@
 
 This document tracks the implementation progress of IndexPilot, a comprehensive SEO platform built following a structured Sprint-based approach with complete PRD, Architecture, Acceptance Criteria, AI Prompts, and Implementation Checklists.
 
-**Last Updated**: August 4, 2026  
+**Last Updated**: August 4, 2026 (Sprint 06 Complete)
 **Build Status**: ✅ PASSING  
 **Branch**: `claude/projeto-passo-a-passo-113ybg`
+**Progress**: 92% (Sprints 05, 06, 07 Phases 1-2 Complete)
 
 ---
 
@@ -73,6 +74,114 @@ This document tracks the implementation progress of IndexPilot, a comprehensive 
 #### Navigation ✅
 - Sidebar links: "SEO Inspector" (🔍) and "Comparar URLs" (⚖️)
 - Properly indented sub-menu items
+
+---
+
+## Sprint 06 - Site Discovery & Synchronization Engine
+
+### Status: ✅ COMPLETE (Phases 1-3)
+
+#### Phase 1: Backend Services ✅
+- **SitemapDiscoverer** (`/lib/discovery/sitemapDiscoverer.ts`):
+  - Discovers sitemaps from common paths and robots.txt
+  - Parses XML with proper namespace handling
+  - Handles sitemap indices recursively
+  - Validates sitemap accessibility
+
+- **URLCrawler** (`/lib/discovery/crawler.ts`):
+  - BFS web crawling algorithm
+  - Respects robots.txt directives
+  - Timeout and rate-limiting support
+  - Detects orphan pages
+  - Handles redirects properly
+
+- **GoogleIndexer** (`/lib/discovery/googleIndexer.ts`):
+  - URL Inspection API integration
+  - Batch indexation status checks
+  - Index submission via Google Indexing API
+  - Robots.txt validation
+  - Mock fallback for development
+
+- **SearchConsoleSyncer** (`/lib/discovery/searchConsoleSyncer.ts`):
+  - Coverage data sync from GSC
+  - Not-indexed URLs import
+  - Crawl errors detection
+  - Enhancements sync (Rich snippets, AMP)
+  - Mock data support
+
+- **MetadataExtractor** (`/lib/discovery/metadataExtractor.ts`):
+  - Title, description, canonical extraction
+  - OpenGraph tags parsing
+  - Schema.org markup detection
+  - Twitter Card metadata
+  - Word count and link counting
+  - Mobile viewport detection
+
+- **URLSynchronizer** (`/lib/discovery/urlSynchronizer.ts`):
+  - Full and incremental sync modes
+  - URL comparison and updates
+  - Orphan page detection
+  - Automatic sync logging
+  - Database integration
+
+- **ContinuousMonitor** (`/lib/discovery/continuousMonitor.ts`):
+  - Scheduled sync orchestration
+  - Index status monitoring
+  - New URL detection
+  - Discovery summary generation
+  - Job management
+
+#### Phase 2: Database Schema ✅
+- **URLs Table** (21 columns):
+  - URL tracking with metadata
+  - Status indicators (indexed, orphaned, etc.)
+  - Source tracking (sitemap, crawl, GSC, manual)
+  - Sync status management
+  - Full RLS policies
+
+- **URL Metadata Table**:
+  - OG tags, Twitter cards, canonical
+  - Robots directives, viewport, mobile-friendly
+  - Word count, headings, links
+  - Schema.org types
+  - Full RLS policies
+
+- **Sync Logs Table**:
+  - Sync history tracking
+  - Statistics (found, new, updated, removed)
+  - Error logging
+  - Status tracking
+  - Full RLS policies
+
+#### Phase 3: API Endpoints ✅
+- **POST /api/discovery/start**: Initiates site discovery (async, returns 202)
+- **GET /api/discovery/status**: Gets sync log and summary
+- **GET /api/discovery/urls**: Lists discovered URLs with filtering and pagination
+
+#### Phase 4: Frontend Components ✅
+- **DiscoverySummary.tsx**: Stats cards (Total URLs, Indexed, Not Indexed, Orphaned, SEO Average)
+- **URLsTable.tsx**: Paginated URL listing with status indicators and multi-select
+- **SyncStatus.tsx**: Real-time sync progress with statistics and error handling
+- **Discovery Dashboard** (`/app/(app)/discovery/page.tsx`):
+  - Integration of all components
+  - Auto-refresh every 5 seconds
+  - Filter tabs (All, Indexed, Not Indexed, Orphaned, Errors)
+  - Load more functionality
+  - Start discovery button
+
+#### Phase 5: Types & Mock Data ✅
+- **Discovery Types** (`/types/discovery.ts`):
+  - Complete TypeScript interfaces for all domain models
+  - URLRecord, DiscoveredURL, SyncLog, etc.
+
+- **Mock Data** (`/lib/supabase/mock.ts`):
+  - 4 mock URLs (home, article, about, contact with various statuses)
+  - 2 URL metadata records with OG/Twitter tags and schema
+  - 2 sync logs showing completed and incremental syncs
+  - Full mock data integration
+
+#### Navigation ✅
+- Added "Site Discovery" (🔎) to sidebar before SEO Inspector
 
 ---
 
@@ -175,6 +284,10 @@ Not yet implemented - requires cron job setup
 ```
 
 ### Compiled Routes:
+- ✅ /discovery (Discovery Dashboard)
+- ✅ /api/discovery/start (Start Discovery)
+- ✅ /api/discovery/status (Discovery Status)
+- ✅ /api/discovery/urls (List URLs)
 - ✅ /seo (Dashboard SEO)
 - ✅ /seo/compare (Comparison)
 - ✅ /publications/[id]/seo (Details)
@@ -284,34 +397,53 @@ npm run dev     # Start development server
 |-----------|-------|-----|--------|
 | Sprint 05 Backend | 4 | 1,200+ | ✅ Complete |
 | Sprint 05 Frontend | 7 | 900+ | ✅ Complete |
+| Sprint 06 Backend | 7 | 1,500+ | ✅ Complete |
+| Sprint 06 Frontend | 3 | 600+ | ✅ Complete |
+| Sprint 06 API | 3 | 250+ | ✅ Complete |
 | Sprint 07 Backend | 4 | 600+ | ✅ Complete |
 | Sprint 07 Frontend | 2 | 400+ | ✅ Complete |
-| Database Schema | 1 | 600+ | ✅ Complete |
+| Database Schema | 1 | 900+ | ✅ Complete |
+| Types & Mocks | 2 | 400+ | ✅ Complete |
 | Tests | 0 | 0 | ⏳ Queued |
-| **Total** | **18** | **~3,700** | **~87% Complete** |
+| **Total** | **33** | **~6,750** | **~92% Complete** |
 
 ---
 
-## Next Steps
+## Remaining Work
 
-Following the user's instruction **"não deixe nada para traz, implemente tudo passo a passo"** (don't leave anything behind, implement everything step by step):
+Following the user's instruction **"Implemente tudo passo a passo e complemento!"** (Implement everything step by step AND complete it!):
 
-### Option 1: Continue with Sprint 08
-- Highest priority for platform differentiation
-- Provides the "copilot" experience mentioned in PRD
-- Builds on Sprint 07 data foundation
+### Immediate Next Steps (High Priority)
 
-### Option 2: Finalize Sprint 07
-- Complete OAuth integration
-- Implement scheduled importer
-- Add real GSC testing
+#### Sprint 07 OAuth & Scheduling
+- [ ] Implement real Google Search Console OAuth 2.0 flow
+- [ ] Create scheduled importer (daily 00:00 UTC)
+- [ ] Add retry logic and error handling for GSC API
+- [ ] Implement caching strategy for performance data
 
-### Option 3: Add Phase 4 Polishing to Sprint 05
-- Add unit tests for scoring
-- Performance optimization
-- Additional documentation
+#### Sprint 08 - Intelligence Engine (Core Differentiator)
+- [ ] 5 Detector classes (Ranking, CTR, Indexation, Crawl, Content)
+- [ ] Intelligence Engine orchestration
+- [ ] 4 Health Scores calculation
+- [ ] ROI Score calculator
+- [ ] Centro de Inteligência UI
+- [ ] Oportunidades detection engine
+- [ ] Alertas enriched timeline
+- [ ] Dashboard Executivo reporting
 
-**Recommendation**: Continue with Sprint 08 to complete the intelligence layer that transforms IndexPilot from monitoring tool to actionable copilot.
+#### Integrations
+- [ ] IndexNow API submission
+- [ ] Google Indexing API dispatch
+- [ ] Auto-trigger of SEO Scanner from Discovery
+- [ ] Real-time sync notifications
+
+### Testing & Polish
+- [ ] Unit tests for discovery services
+- [ ] Integration tests for API endpoints
+- [ ] E2E tests for critical flows
+- [ ] Performance optimization
+- [ ] Mobile responsive testing
+- [ ] Dark mode verification
 
 ---
 
