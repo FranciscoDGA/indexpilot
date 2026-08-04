@@ -15,6 +15,7 @@ const navItems = [
   { href: '/opportunities', label: 'Oportunidades', icon: '⭐', indent: true },
   { href: '/alerts', label: 'Alertas', icon: '🚨', indent: true },
   { href: '/reports', label: 'Relatórios', icon: '📋' },
+  { href: '/alert-preferences', label: 'Preferências de Alertas', icon: '🔔' },
   { href: '/performance', label: 'Performance', icon: '📊' },
   { href: '/api-keys', label: 'API Keys', icon: '🔑' },
   { href: '/settings', label: 'Configurações', icon: '⚙️' },
