@@ -10,6 +10,9 @@ interface OGEStats {
   cluster_gaps: number;
   freshness_opportunities: number;
   decay_alerts: number;
+  discover_not_ready?: number;
+  cannibalizations?: number;
+  crawl_waste?: number;
 }
 
 export default function OGEDashboard() {
@@ -148,71 +151,119 @@ export default function OGEDashboard() {
         </Link>
       </div>
 
-      {/* Module Descriptions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
-          <h3 className="font-bold text-blue-900 mb-2">CTR Optimization</h3>
-          <p className="text-sm text-blue-800 mb-3">
-            Identifica lacunas entre CTR esperado e atual. Gera sugestões de títulos e meta descriptions otimizadas.
-          </p>
-          <Link
-            href={`/oge/ctr?publication_id=${publicationId}`}
-            className="text-sm font-semibold text-blue-600 hover:text-blue-800"
-          >
-            Explorar →
-          </Link>
-        </div>
+      {/* Phase 1: Foundation Modules */}
+      <div className="mb-10">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">Fase 1: Foundation</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
+            <h3 className="font-bold text-blue-900 mb-2">CTR Optimization</h3>
+            <p className="text-sm text-blue-800 mb-3">
+              Identifica lacunas entre CTR esperado e atual. Gera sugestões de títulos e meta descriptions otimizadas.
+            </p>
+            <Link
+              href={`/oge/ctr?publication_id=${publicationId}`}
+              className="text-sm font-semibold text-blue-600 hover:text-blue-800"
+            >
+              Explorar →
+            </Link>
+          </div>
 
-        <div className="bg-orange-50 p-6 rounded-lg border border-orange-200">
-          <h3 className="font-bold text-orange-900 mb-2">Internal Linking</h3>
-          <p className="text-sm text-orange-800 mb-3">
-            Detecta páginas órfãs, sugere links relevantes e visualiza a força da sua malha interna.
-          </p>
-          <Link
-            href={`/oge/links?publication_id=${publicationId}`}
-            className="text-sm font-semibold text-orange-600 hover:text-orange-800"
-          >
-            Explorar →
-          </Link>
-        </div>
+          <div className="bg-orange-50 p-6 rounded-lg border border-orange-200">
+            <h3 className="font-bold text-orange-900 mb-2">Internal Linking</h3>
+            <p className="text-sm text-orange-800 mb-3">
+              Detecta páginas órfãs, sugere links relevantes e visualiza a força da sua malha interna.
+            </p>
+            <Link
+              href={`/oge/links?publication_id=${publicationId}`}
+              className="text-sm font-semibold text-orange-600 hover:text-orange-800"
+            >
+              Explorar →
+            </Link>
+          </div>
 
-        <div className="bg-purple-50 p-6 rounded-lg border border-purple-200">
-          <h3 className="font-bold text-purple-900 mb-2">Topic Clusters</h3>
-          <p className="text-sm text-purple-800 mb-3">
-            Agrupa keywords por tópicos semânticos, calcula completude e identifica artigos faltantes.
-          </p>
-          <Link
-            href={`/oge/clusters?publication_id=${publicationId}`}
-            className="text-sm font-semibold text-purple-600 hover:text-purple-800"
-          >
-            Explorar →
-          </Link>
-        </div>
+          <div className="bg-purple-50 p-6 rounded-lg border border-purple-200">
+            <h3 className="font-bold text-purple-900 mb-2">Topic Clusters</h3>
+            <p className="text-sm text-purple-800 mb-3">
+              Agrupa keywords por tópicos semânticos, calcula completude e identifica artigos faltantes.
+            </p>
+            <Link
+              href={`/oge/clusters?publication_id=${publicationId}`}
+              className="text-sm font-semibold text-purple-600 hover:text-purple-800"
+            >
+              Explorar →
+            </Link>
+          </div>
 
-        <div className="bg-green-50 p-6 rounded-lg border border-green-200">
-          <h3 className="font-bold text-green-900 mb-2">Freshness Engine</h3>
-          <p className="text-sm text-green-800 mb-3">
-            Detecta conteúdo desatualizado, correlaciona com posição no SERP e previne impacto de atualizações.
-          </p>
-          <Link
-            href={`/oge/freshness?publication_id=${publicationId}`}
-            className="text-sm font-semibold text-green-600 hover:text-green-800"
-          >
-            Explorar →
-          </Link>
-        </div>
+          <div className="bg-green-50 p-6 rounded-lg border border-green-200">
+            <h3 className="font-bold text-green-900 mb-2">Freshness Engine</h3>
+            <p className="text-sm text-green-800 mb-3">
+              Detecta conteúdo desatualizado, correlaciona com posição no SERP e previne impacto de atualizações.
+            </p>
+            <Link
+              href={`/oge/freshness?publication_id=${publicationId}`}
+              className="text-sm font-semibold text-green-600 hover:text-green-800"
+            >
+              Explorar →
+            </Link>
+          </div>
 
-        <div className="bg-red-50 p-6 rounded-lg border border-red-200 md:col-span-2">
-          <h3 className="font-bold text-red-900 mb-2">Content Decay Engine</h3>
-          <p className="text-sm text-red-800 mb-3">
-            Detecta declínio gradual de desempenho, analisa causas raiz e recomenda estratégias de recuperação.
-          </p>
-          <Link
-            href={`/oge/decay?publication_id=${publicationId}`}
-            className="text-sm font-semibold text-red-600 hover:text-red-800"
-          >
-            Explorar →
-          </Link>
+          <div className="bg-red-50 p-6 rounded-lg border border-red-200 md:col-span-2">
+            <h3 className="font-bold text-red-900 mb-2">Content Decay Engine</h3>
+            <p className="text-sm text-red-800 mb-3">
+              Detecta declínio gradual de desempenho, analisa causas raiz e recomenda estratégias de recuperação.
+            </p>
+            <Link
+              href={`/oge/decay?publication_id=${publicationId}`}
+              className="text-sm font-semibold text-red-600 hover:text-red-800"
+            >
+              Explorar →
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Phase 2: Intelligence Modules */}
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">Fase 2: Intelligence</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-indigo-50 p-6 rounded-lg border border-indigo-200">
+            <h3 className="font-bold text-indigo-900 mb-2">Google Discover Readiness</h3>
+            <p className="text-sm text-indigo-800 mb-3">
+              Audita compatibilidade com Google Discover. Valida imagens, OG tags, frescor do conteúdo e Core Web Vitals.
+            </p>
+            <Link
+              href={`/oge/discover?publication_id=${publicationId}`}
+              className="text-sm font-semibold text-indigo-600 hover:text-indigo-800"
+            >
+              Explorar →
+            </Link>
+          </div>
+
+          <div className="bg-pink-50 p-6 rounded-lg border border-pink-200">
+            <h3 className="font-bold text-pink-900 mb-2">Cannibalization Engine</h3>
+            <p className="text-sm text-pink-800 mb-3">
+              Detecta canibalizações de keywords, quantifica perda de visibilidade e sugere resoluções (merge, redirect).
+            </p>
+            <Link
+              href={`/oge/cannibalization?publication_id=${publicationId}`}
+              className="text-sm font-semibold text-pink-600 hover:text-pink-800"
+            >
+              Explorar →
+            </Link>
+          </div>
+
+          <div className="bg-cyan-50 p-6 rounded-lg border border-cyan-200 md:col-span-2">
+            <h3 className="font-bold text-cyan-900 mb-2">Crawl Budget Analyzer</h3>
+            <p className="text-sm text-cyan-800 mb-3">
+              Identifica desperdício de orçamento de rastreamento: 404s, soft 404s, redirecionamentos, duplicados. Recomenda otimizações.
+            </p>
+            <Link
+              href={`/oge/crawl-budget?publication_id=${publicationId}`}
+              className="text-sm font-semibold text-cyan-600 hover:text-cyan-800"
+            >
+              Explorar →
+            </Link>
+          </div>
         </div>
       </div>
     </div>
