@@ -6,7 +6,9 @@ import { Badge } from '@/components/common/Badge';
 import { InsightCard } from '@/components/intelligence/InsightCard';
 import { RecommendationList } from '@/components/intelligence/RecommendationList';
 import { HealthScoreGauge } from '@/components/intelligence/HealthScoreGauge';
+import { ReportExporter } from '@/components/intelligence/ReportExporter';
 import { Insight, Recommendation, SeoHealthScore } from '@/types/intelligence';
+import Link from 'next/link';
 
 export default function IntelligencePage() {
   const [siteId] = useState('site-1');
@@ -201,6 +203,27 @@ export default function IntelligencePage() {
               />
             )}
           </div>
+
+          <div>
+            <ReportExporter publicationId={siteId} period="daily" />
+          </div>
+
+          <Card className="bg-blue-50 border-blue-200">
+            <CardHeader>
+              <CardTitle className="text-sm">📊 Ver Histórico</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm">
+              <p className="text-gray-600 mb-3">
+                Acesse o histórico completo de relatórios e exporte em diferentes formatos.
+              </p>
+              <Link
+                href="/reports"
+                className="inline-block text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Ir para Relatórios →
+              </Link>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

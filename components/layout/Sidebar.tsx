@@ -10,10 +10,12 @@ const navItems = [
   { href: '/discovery', label: 'Site Discovery', icon: '🔎' },
   { href: '/seo', label: 'SEO Inspector', icon: '🔍' },
   { href: '/seo/compare', label: 'Comparar URLs', icon: '⚖️', indent: true },
+  { href: '/executive-dashboard', label: 'Dashboard Executivo', icon: '📈' },
   { href: '/intelligence', label: 'Centro de Inteligência', icon: '🧠' },
   { href: '/opportunities', label: 'Oportunidades', icon: '⭐', indent: true },
   { href: '/alerts', label: 'Alertas', icon: '🚨', indent: true },
-  { href: '/performance', label: 'Performance', icon: '📈' },
+  { href: '/reports', label: 'Relatórios', icon: '📋' },
+  { href: '/performance', label: 'Performance', icon: '📊' },
   { href: '/api-keys', label: 'API Keys', icon: '🔑' },
   { href: '/settings', label: 'Configurações', icon: '⚙️' },
 ];
