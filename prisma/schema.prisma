@@ -1,0 +1,313 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// SPRINT 01: FOUNDATION CORE
+// ============================================================================
+
+model User {
+  id                String              @id @default(cuid())
+  email             String              @unique
+  name              String?
+  password          String?
+  emailVerified     DateTime?
+  image             String?
+  role              String              @default("user") // user, admin
+  status            String              @default("active") // active, inactive, suspended
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  sites             Site[]
+  apiKeys           ApiKey[]
+  logs              Log[]
+  googleAccounts    GoogleAccount[]
+  providerCredentials ProviderCredential[]
+
+  @@map("users")
+}
+
+model Site {
+  id                String              @id @default(cuid())
+  name              String
+  domain            String              @unique
+  status            String              @default("active") // active, inactive
+  ownerId           String
+  owner             User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  urls              Url[]
+  webhooks          Webhook[]
+  logs              Log[]
+  syncJobs          SyncJob[]
+  urlDispatches     UrlDispatch[]
+
+  @@index([ownerId])
+  @@map("sites")
+}
+
+model Url {
+  id                String              @id @default(cuid())
+  siteId            String
+  site              Site                @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  url               String
+  type              String              @default("article") // article, page, category, tag
+  priority          Int                 @default(50) // 0-100
+  status            String              @default("pending") // pending, queued, processing, indexed, failed, retry
+  validationStatus  String              @default("pending") // pending, passed, failed
+  validationError   String?
+  attempts          Int                 @default(0)
+  lastAttemptAt     DateTime?
+  nextRetryAt       DateTime?
+  indexedAt         DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  logs              Log[]
+  dispatches        UrlDispatch[]
+
+  @@unique([siteId, url])
+  @@index([siteId])
+  @@index([status])
+  @@index([priority])
+  @@map("urls")
+}
+
+model Webhook {
+  id                String              @id @default(cuid())
+  siteId            String
+  site              Site                @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  secret            String
+  active            Boolean             @default(true)
+  lastTriggeredAt   DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([siteId])
+  @@map("webhooks")
+}
+
+model Log {
+  id                String              @id @default(cuid())
+  userId            String
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  siteId            String
+  site              Site                @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  urlId             String?
+  url               Url?                @relation(fields: [urlId], references: [id], onDelete: SetNull)
+  action            String              // index_received, validation_passed, validation_failed, queued, processing, indexed, failed, retried
+  provider          String?             // google, indexnow, etc
+  status            String              // success, failed, pending
+  response          String?             // JSON stringified
+  duration          Int?                // milliseconds
+  error             String?
+  metadata          String?             // JSON stringified
+  createdAt         DateTime            @default(now())
+
+  @@index([userId])
+  @@index([siteId])
+  @@index([urlId])
+  @@index([action])
+  @@index([provider])
+  @@map("logs")
+}
+
+model ApiKey {
+  id                String              @id @default(cuid())
+  userId            String
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token             String              @unique
+  name              String
+  active            Boolean             @default(true)
+  lastUsedAt        DateTime?
+  expiresAt         DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([userId])
+  @@index([token])
+  @@map("api_keys")
+}
+
+model QueueJob {
+  id                String              @id @default(cuid())
+  urlId             String
+  status            String              @default("pending") // pending, processing, completed, failed
+  priority          Int                 @default(50)
+  attempts          Int                 @default(0)
+  maxAttempts       Int                 @default(5)
+  error             String?
+  result            String?             // JSON stringified
+  scheduledAt       DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([status])
+  @@index([priority])
+  @@index([scheduledAt])
+  @@map("queue_jobs")
+}
+
+// ============================================================================
+// SPRINT 02: SEARCH ENGINE INTEGRATION PLATFORM (SEIP)
+// ============================================================================
+
+model Provider {
+  id                String              @id @default(cuid())
+  name              String              @unique // google, indexnow
+  enabled           Boolean             @default(true)
+  type              String              // search_engine, indexing_service
+  description       String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  credentials       ProviderCredential[]
+  dispatches        UrlDispatch[]
+
+  @@map("providers")
+}
+
+model ProviderCredential {
+  id                String              @id @default(cuid())
+  providerId        String
+  provider          Provider            @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  encryptedData     String              // Encrypted JSON
+  status            String              @default("active") // active, inactive, expired
+  expiresAt         DateTime?
+  lastUsedAt        DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@unique([providerId, userId])
+  @@index([providerId])
+  @@index([userId])
+  @@map("provider_credentials")
+}
+
+model GoogleAccount {
+  id                String              @id @default(cuid())
+  userId            String
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email             String
+  projectId         String?
+  clientId          String?
+  credentialType    String              // oauth, service_account
+  status            String              @default("active") // active, expired, revoked
+  encryptedToken    String?
+  refreshToken      String?
+  tokenExpiresAt    DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  gscProperties     GSCProperty[]
+
+  @@unique([userId, email])
+  @@index([userId])
+  @@map("google_accounts")
+}
+
+model GSCProperty {
+  id                String              @id @default(cuid())
+  googleAccountId   String
+  googleAccount     GoogleAccount       @relation(fields: [googleAccountId], references: [id], onDelete: Cascade)
+  siteId            String?
+  siteUrl           String
+  propertyType      String              // domain, url_prefix
+  status            String              @default("verified") // verified, unverified
+  isPrimary         Boolean             @default(false)
+  lastSyncedAt      DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  gscData           GSCData[]
+
+  @@unique([googleAccountId, siteUrl])
+  @@index([googleAccountId])
+  @@map("gsc_properties")
+}
+
+model GSCData {
+  id                String              @id @default(cuid())
+  gscPropertyId     String
+  gscProperty       GSCProperty         @relation(fields: [gscPropertyId], references: [id], onDelete: Cascade)
+  coverage          String?             // JSON: {indexed, notIndexed, excluded, etc}
+  enhancements      String?             // JSON: {ampErrors, mobileUsability, etc}
+  lastUpdatedAt     DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([gscPropertyId])
+  @@map("gsc_data")
+}
+
+model UrlDispatch {
+  id                String              @id @default(cuid())
+  urlId             String
+  url               Url                 @relation(fields: [urlId], references: [id], onDelete: Cascade)
+  siteId            String
+  site              Site                @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  providerId        String
+  provider          Provider            @relation(fields: [providerId], references: [id])
+  status            String              @default("pending") // pending, sent, success, failed
+  response          String?             // JSON stringified
+  attempts          Int                 @default(0)
+  maxAttempts       Int                 @default(5)
+  error             String?
+  lastAttemptAt     DateTime?
+  nextRetryAt       DateTime?
+  successAt         DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@unique([urlId, providerId])
+  @@index([urlId])
+  @@index([providerId])
+  @@index([status])
+  @@map("url_dispatches")
+}
+
+model SyncJob {
+  id                String              @id @default(cuid())
+  siteId            String
+  site              Site                @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  provider          String              // google, indexnow
+  type              String              // property_sync, status_sync, error_sync
+  status            String              @default("pending") // pending, running, completed, failed
+  startedAt         DateTime?
+  finishedAt        DateTime?
+  duration          Int?                // milliseconds
+  itemsProcessed    Int                 @default(0)
+  itemsFailed       Int                 @default(0)
+  error             String?
+  createdAt         DateTime            @default(now())
+
+  @@index([siteId])
+  @@index([provider])
+  @@index([status])
+  @@map("sync_jobs")
+}
+
+model IndexNowCredential {
+  id                String              @id @default(cuid())
+  siteId            String
+  key               String              @unique
+  status            String              @default("active") // active, inactive
+  published         Boolean             @default(false)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@map("indexnow_credentials")
+}
