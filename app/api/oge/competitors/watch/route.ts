@@ -46,16 +46,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data: alerts, count: alerts.length });
     }
 
+    if (action === 'strategy') {
+      const strategy = await engine.analyzeStrategy(domain);
+      return NextResponse.json({ data: strategy });
+    }
+
+    if (action === 'new_content') {
+      const newContent = await engine.getCompetitorNewContent(domain);
+      return NextResponse.json({ data: newContent, count: newContent.length });
+    }
+
     // Default: return all metrics
     const metrics = await engine.getCompetitorMetrics(domain);
     const growth = await engine.trackCompetitorGrowth(domain);
-    const alerts = await engine.getCompetitorAlerts(domain);
+    const allAlerts = await engine.getCompetitorAlerts(domain);
 
     return NextResponse.json({
       domain,
       metrics,
       growth,
-      alerts,
+      alerts: allAlerts,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

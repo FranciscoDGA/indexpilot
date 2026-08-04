@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     }
 
     const publicationId = request.nextUrl.searchParams.get('publication_id');
+    const action = request.nextUrl.searchParams.get('action');
     const type = request.nextUrl.searchParams.get('type');
     const limit = parseInt(request.nextUrl.searchParams.get('limit') || '20');
 
@@ -21,6 +22,28 @@ export async function GET(request: NextRequest) {
     }
 
     const engine = new ContentOpportunityFinder();
+
+    if (action === 'all') {
+      const all = await engine.findAllOpportunities(publicationId);
+      return NextResponse.json({
+        data: all,
+        count: all.length,
+      });
+    }
+
+    if (action === 'gaps') {
+      const gaps = await engine.analyzeContentGaps(publicationId);
+      return NextResponse.json({
+        data: gaps,
+      });
+    }
+
+    if (action === 'calendar') {
+      const calendar = await engine.generateContentCalendar(publicationId, 3);
+      return NextResponse.json({
+        data: calendar,
+      });
+    }
 
     if (type === 'high_impression') {
       const opportunities = await engine.findHighImpressionGaps(publicationId);

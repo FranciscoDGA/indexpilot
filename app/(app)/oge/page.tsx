@@ -266,6 +266,83 @@ export default function OGEDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Phase 3: Market Intelligence */}
+      <div className="mb-10 mt-10">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">Fase 3: Market Intelligence</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-teal-50 p-6 rounded-lg border border-teal-200">
+            <h3 className="font-bold text-teal-900 mb-2">SERP Intelligence</h3>
+            <p className="text-sm text-teal-800 mb-3">
+              Rastreia featured snippets, FAQs, vídeos, news e AI Overviews nos seus keywords. Identifica oportunidades de captura.
+            </p>
+            <Link
+              href={`/oge/serp?publication_id=${publicationId}`}
+              className="text-sm font-semibold text-teal-600 hover:text-teal-800"
+            >
+              Explorar →
+            </Link>
+          </div>
+
+          <div className="bg-slate-50 p-6 rounded-lg border border-slate-200">
+            <h3 className="font-bold text-slate-900 mb-2">Competitor Watch</h3>
+            <p className="text-sm text-slate-800 mb-3">
+              Monitora métricas, conteúdo novo e estratégia dos seus competidores. Identifica oportunidades no mercado.
+            </p>
+            <Link
+              href={`/oge/competitors?publication_id=${publicationId}`}
+              className="text-sm font-semibold text-slate-600 hover:text-slate-800"
+            >
+              Explorar →
+            </Link>
+          </div>
+
+          <div className="bg-amber-50 p-6 rounded-lg border border-amber-200 md:col-span-2">
+            <h3 className="font-bold text-amber-900 mb-2">Content Opportunity Finder</h3>
+            <p className="text-sm text-amber-800 mb-3">
+              Cruza dados de GSC com SERP para encontrar gaps de conteúdo. Prioriza oportunidades por impacto potencial.
+            </p>
+            <Link
+              href={`/oge/opportunities?publication_id=${publicationId}`}
+              className="text-sm font-semibold text-amber-600 hover:text-amber-800"
+            >
+              Explorar →
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Phase 4: Advanced Growth */}
+      <div className="mb-10 mt-10">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">Fase 4: Advanced Growth</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-violet-50 p-6 rounded-lg border border-violet-200">
+            <h3 className="font-bold text-violet-900 mb-2">Domain Trust Evolution</h3>
+            <p className="text-sm text-violet-800 mb-3">
+              Sistema único de 8 componentes para rastrear confiança do domínio. Inclui crawl trust, discovery speed, index velocity e mais.
+            </p>
+            <Link
+              href={`/oge/trust?publication_id=${publicationId}`}
+              className="text-sm font-semibold text-violet-600 hover:text-violet-800"
+            >
+              Explorar →
+            </Link>
+          </div>
+
+          <div className="bg-rose-50 p-6 rounded-lg border border-rose-200">
+            <h3 className="font-bold text-rose-900 mb-2">Growth Simulator</h3>
+            <p className="text-sm text-rose-800 mb-3">
+              Prevê impacto de mudanças com base no histórico do seu site. Único no mercado: usa dados reais, não benchmarks.
+            </p>
+            <Link
+              href={`/oge/simulator?publication_id=${publicationId}`}
+              className="text-sm font-semibold text-rose-600 hover:text-rose-800"
+            >
+              Explorar →
+            </Link>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
