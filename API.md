@@ -1,8 +1,8 @@
-# IndexPilot API Documentation
+# Documentação da API IndexPilot
 
-## Overview
+## Visão Geral
 
-IndexPilot is a production-ready URL indexing platform that integrates with multiple search engines and indexing services. The API follows RESTful conventions and uses JWT authentication.
+IndexPilot é uma plataforma de indexação de URLs pronta para produção que se integra com múltiplos mecanismos de busca e serviços de indexação. A API segue convenções RESTful e usa autenticação JWT.
 
 ## Authentication
 
