@@ -14,6 +14,7 @@ const navItems = [
   { href: '/intelligence', label: 'Centro de Inteligência', icon: '🧠' },
   { href: '/opportunities', label: 'Oportunidades', icon: '⭐', indent: true },
   { href: '/alerts', label: 'Alertas', icon: '🚨', indent: true },
+  { href: '/oge', label: 'Organic Growth Engine', icon: '🚀' },
   { href: '/reports', label: 'Relatórios', icon: '📋' },
   { href: '/alert-preferences', label: 'Preferências de Alertas', icon: '🔔' },
   { href: '/performance', label: 'Performance', icon: '📊' },
