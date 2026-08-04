@@ -599,6 +599,164 @@ const mockSyncLogs = [
   },
 ];
 
+// Sprint 08 - Intelligence Mock Data
+const mockInsights = [
+  {
+    id: 'insight-1',
+    publication_id: 'pub-1',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    type: 'ranking_near_top10',
+    priority: 'HIGH' as const,
+    title: 'Página perto do top 10 para "React 19 features"',
+    description: 'Sua página está na posição 12 com 520 impressões. Uma pequena melhoria pode colocá-la no top 10.',
+    recommendation: 'Revisar título e meta description',
+    estimated_impact: 'HIGH',
+    estimated_effort: '5_MIN',
+    status: 'open',
+    metrics: {
+      keyword: 'React 19 features',
+      position: 12,
+      impressions: 520,
+      ctr: 8.1,
+    },
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'insight-2',
+    publication_id: 'pub-1',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    type: 'ctr_very_low',
+    priority: 'MEDIUM' as const,
+    title: 'CTR muito baixo para "JavaScript performance"',
+    description: 'Palavra-chave na posição 12 com 210 impressões mas apenas 5.7% de CTR.',
+    recommendation: 'Reescreva o title e meta description para melhorar relevância',
+    estimated_impact: 'HIGH',
+    estimated_effort: '5_MIN',
+    status: 'open',
+    metrics: {
+      keyword: 'JavaScript performance',
+      position: 12,
+      impressions: 210,
+      currentCtr: 5.7,
+      expectedCtr: 3,
+    },
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'insight-3',
+    publication_id: 'pub-1',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    type: 'content_outdated',
+    priority: 'MEDIUM' as const,
+    title: 'Conteúdo desatualizado na página React 19',
+    description: 'Não foi atualizado há 8 meses. Google favorece conteúdo fresco.',
+    recommendation: 'Atualize as informações, estatísticas e exemplos',
+    estimated_impact: 'MEDIUM',
+    estimated_effort: '30_MIN',
+    status: 'open',
+    metrics: {
+      url: 'https://techblog.com/react-19-released',
+      monthsSinceUpdate: 8,
+    },
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'insight-4',
+    publication_id: 'pub-1',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    type: 'indexation_delayed',
+    priority: 'CRITICAL' as const,
+    title: 'URL não foi indexada após 18 dias',
+    description: 'A página foi descoberta há 18 dias mas ainda não indexou no Google.',
+    recommendation: 'Verifique robots.txt e resubmeta via Search Console',
+    estimated_impact: 'HIGH',
+    estimated_effort: '15_MIN',
+    status: 'open',
+    metrics: {
+      url: 'https://techblog.com/about',
+      daysSinceDiscovery: 18,
+    },
+    created_at: new Date().toISOString(),
+  },
+];
+
+const mockRecommendations = [
+  {
+    id: 'rec-1',
+    publication_id: 'pub-1',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    category: 'ranking',
+    title: 'Otimize o snippet para "React 19 features"',
+    description: 'Quick win: Esta palavra-chave tem alto potencial com pequeno esforço',
+    score: 92,
+    estimated_impact: 'HIGH',
+    estimated_effort: '5_MIN',
+    action_items: ['Reescrever title tag com palavras-chave', 'Melhorar meta description para aumentar apelo'],
+    status: 'active',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'rec-2',
+    publication_id: 'pub-1',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    category: 'content',
+    title: 'Atualize conteúdo da página React 19',
+    description: 'Conteúdo com 8 meses de idade precisa de refresh',
+    score: 78,
+    estimated_impact: 'MEDIUM',
+    estimated_effort: '30_MIN',
+    action_items: ['Adicionar informações recentes', 'Atualizar exemplos de código', 'Adicionar data de atualização'],
+    status: 'active',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'rec-3',
+    publication_id: 'pub-1',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    category: 'indexation',
+    title: 'Resubmeta página no Google Search Console',
+    description: 'Página descoberta há 18 dias ainda não foi indexada',
+    score: 85,
+    estimated_impact: 'HIGH',
+    estimated_effort: '5_MIN',
+    action_items: ['Verificar robots.txt', 'Resubmeter no GSC', 'Adicionar links internos'],
+    status: 'active',
+    created_at: new Date().toISOString(),
+  },
+];
+
+const mockActions = [
+  {
+    id: 'action-1',
+    publication_id: 'pub-1',
+    user_id: 'mock-user-123',
+    insight_id: 'insight-1',
+    recommendation_id: 'rec-1',
+    action: 'Otimizar título para React 19 features',
+    status: 'open',
+    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    notes: null,
+  },
+  {
+    id: 'action-2',
+    publication_id: 'pub-1',
+    user_id: 'mock-user-123',
+    insight_id: 'insight-3',
+    recommendation_id: 'rec-2',
+    action: 'Revisar e atualizar conteúdo React 19',
+    status: 'in_progress',
+    created_at: new Date().toISOString(),
+    notes: 'Iniciado - adicionando novos exemplos de código',
+  },
+];
+
 type QueryBuilder = {
   eq: (field: string, value: any) => QueryBuilder;
   in: (field: string, values: any[]) => QueryBuilder;
@@ -743,6 +901,15 @@ export function createMockSupabaseClient() {
           break;
         case 'sync_logs':
           data = mockSyncLogs;
+          break;
+        case 'insights':
+          data = mockInsights;
+          break;
+        case 'recommendations':
+          data = mockRecommendations;
+          break;
+        case 'actions':
+          data = mockActions;
           break;
         case 'users':
           data = [

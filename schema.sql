@@ -762,6 +762,135 @@ CREATE POLICY "Users can update own gsc imports"
     USING (auth.uid() = user_id);
 
 -- ============================================
+-- SPRINT 08: SEO INTELLIGENCE & RECOMMENDATIONS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS insights (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    publication_id UUID NOT NULL REFERENCES publication_queue(id) ON DELETE CASCADE,
+    site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+    type VARCHAR(50) NOT NULL,
+    priority VARCHAR(20) NOT NULL CHECK (priority IN ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW')),
+
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    recommendation TEXT NOT NULL,
+
+    estimated_impact VARCHAR(20) CHECK (estimated_impact IN ('VERY_HIGH', 'HIGH', 'MEDIUM', 'LOW')),
+    estimated_effort VARCHAR(20) CHECK (estimated_effort IN ('5_MIN', '15_MIN', '30_MIN', '2_HOURS')),
+
+    status VARCHAR(20) NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'resolved', 'dismissed')),
+
+    metrics JSONB,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    resolved_at TIMESTAMP WITH TIME ZONE,
+    dismissed_at TIMESTAMP WITH TIME ZONE,
+    dismissed_reason TEXT
+);
+
+CREATE INDEX idx_insights_publication_id ON insights(publication_id);
+CREATE INDEX idx_insights_priority ON insights(priority);
+CREATE INDEX idx_insights_type ON insights(type);
+CREATE INDEX idx_insights_status ON insights(status);
+CREATE INDEX idx_insights_user_id ON insights(user_id);
+
+CREATE TABLE IF NOT EXISTS recommendations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    publication_id UUID NOT NULL REFERENCES publication_queue(id) ON DELETE CASCADE,
+    site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+    category VARCHAR(50) NOT NULL,
+
+    title TEXT NOT NULL,
+    description TEXT,
+
+    score INTEGER NOT NULL CHECK (score >= 0 AND score <= 100),
+    estimated_impact VARCHAR(20) CHECK (estimated_impact IN ('VERY_HIGH', 'HIGH', 'MEDIUM', 'LOW')),
+    estimated_effort VARCHAR(20) CHECK (estimated_effort IN ('5_MIN', '15_MIN', '30_MIN', '2_HOURS')),
+
+    action_items TEXT[],
+
+    status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'dismissed')),
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    completed_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX idx_recommendations_publication_id ON recommendations(publication_id);
+CREATE INDEX idx_recommendations_score ON recommendations(score DESC);
+CREATE INDEX idx_recommendations_status ON recommendations(status);
+CREATE INDEX idx_recommendations_user_id ON recommendations(user_id);
+
+CREATE TABLE IF NOT EXISTS actions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    publication_id UUID NOT NULL REFERENCES publication_queue(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    insight_id UUID REFERENCES insights(id) ON DELETE SET NULL,
+    recommendation_id UUID REFERENCES recommendations(id) ON DELETE SET NULL,
+
+    action TEXT NOT NULL,
+
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed', 'skipped')),
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    started_at TIMESTAMP WITH TIME ZONE,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    notes TEXT
+);
+
+CREATE INDEX idx_actions_publication_id ON actions(publication_id);
+CREATE INDEX idx_actions_status ON actions(status);
+CREATE INDEX idx_actions_user_id ON actions(user_id);
+
+-- ============================================
+-- ENABLE RLS FOR SPRINT 08 TABLES
+-- ============================================
+
+ALTER TABLE insights ENABLE ROW LEVEL SECURITY;
+ALTER TABLE recommendations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE actions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own insights"
+    ON insights FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own insights"
+    ON insights FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own insights"
+    ON insights FOR UPDATE
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can view own recommendations"
+    ON recommendations FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own recommendations"
+    ON recommendations FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own recommendations"
+    ON recommendations FOR UPDATE
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can view own actions"
+    ON actions FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own actions"
+    ON actions FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own actions"
+    ON actions FOR UPDATE
+    USING (auth.uid() = user_id);
+
+-- ============================================
 -- TRIGGERS FOR SPRINT 07 TABLES
 -- ============================================
 
