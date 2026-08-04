@@ -7,6 +7,8 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: '📊' },
   { href: '/sites', label: 'Sites', icon: '🌐' },
   { href: '/publications', label: 'Publicações', icon: '📝' },
+  { href: '/seo', label: 'SEO Inspector', icon: '🔍' },
+  { href: '/seo/compare', label: 'Comparar URLs', icon: '⚖️', indent: true },
   { href: '/api-keys', label: 'API Keys', icon: '🔑' },
   { href: '/settings', label: 'Configurações', icon: '⚙️' },
 ];
@@ -21,18 +23,22 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-1 p-4">
-        {navItems.map((item) => (
+        {navItems.map((item: any) => (
           <Link
             key={item.href}
             href={item.href}
-            className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
+            className={`flex items-center gap-3 rounded-lg transition-colors ${
+              item.indent ? 'pl-8 py-1.5 px-4' : 'px-4 py-2'
+            } ${
               pathname === item.href
                 ? 'bg-primary text-primary-foreground'
                 : 'text-foreground hover:bg-muted'
             }`}
           >
-            <span>{item.icon}</span>
-            <span className="text-sm font-medium">{item.label}</span>
+            {!item.indent && <span>{item.icon}</span>}
+            <span className={item.indent ? 'text-xs font-medium' : 'text-sm font-medium'}>
+              {item.label}
+            </span>
           </Link>
         ))}
       </nav>
