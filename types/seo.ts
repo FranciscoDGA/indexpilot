@@ -47,6 +47,7 @@ export interface SeoAudit {
   grade: Grade;
   status: AuditStatus;
   error_message?: string;
+  seo_checks?: SeoCheck[];
   checks?: SeoCheck[];
   scanned_at?: string;
   created_at: string;
