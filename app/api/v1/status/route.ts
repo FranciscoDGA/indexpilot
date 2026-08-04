@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       site,
       totalUrls: siteQueue.length,
       pending: siteQueue.filter((j) => j.status === 'pending').length,
-      queued: siteQueue.filter((j) => j.status === 'queued').length,
+      queued: siteQueue.filter((j) => j.status === 'pending').length,
       processing: siteQueue.filter((j) => j.status === 'processing').length,
       indexed: siteQueue.filter((j) => j.status === 'completed').length,
       failed: siteQueue.filter((j) => j.status === 'failed').length,

@@ -92,7 +92,7 @@ async function handleExport(
       break;
   }
 
-  const body = typeof content === 'string' ? content : new TextEncoder().encode(content);
+  const body = typeof content === 'string' ? content : (Buffer.isBuffer(content) ? new Uint8Array(content) : new TextEncoder().encode(content));
 
   return new NextResponse(body, {
     status: 200,

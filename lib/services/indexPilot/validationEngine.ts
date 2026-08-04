@@ -35,10 +35,13 @@ export class ValidationEngine {
 
     // Check 3: HTTP Status 200
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
       const response = await fetch(url, {
         method: 'HEAD',
-        timeout: 5000,
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       if (response.status === 200) {
         checks.statusCode200 = true;
@@ -53,7 +56,10 @@ export class ValidationEngine {
 
     // Check 4: Canonical tag
     try {
-      const response = await fetch(url);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
       const html = await response.text();
 
       if (html.includes('rel="canonical"') || html.includes("rel='canonical'")) {
@@ -75,7 +81,10 @@ export class ValidationEngine {
     // Check 5: robots.txt
     const robotsUrl = new URL(url).origin + '/robots.txt';
     try {
-      const robotsResponse = await fetch(robotsUrl, { timeout: 5000 });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const robotsResponse = await fetch(robotsUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
       if (robotsResponse.ok) {
         const robotsContent = await robotsResponse.text();
         if (!robotsContent.includes('Disallow: /')) {
@@ -91,7 +100,10 @@ export class ValidationEngine {
     // Check 6: sitemap.xml
     const sitemapUrl = new URL(url).origin + '/sitemap.xml';
     try {
-      const sitemapResponse = await fetch(sitemapUrl, { timeout: 5000 });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const sitemapResponse = await fetch(sitemapUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
       if (sitemapResponse.ok) {
         checks.sitemapPresent = true;
       }

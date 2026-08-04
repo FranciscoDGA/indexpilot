@@ -63,7 +63,7 @@ export class DomainTrustEvolutionEngine {
    * 1. Crawl Trust (0-100): How often Googlebot visits
    * Higher = more frequent crawls = more trust
    */
-  private async calculateCrawlTrust(publicationId: string): number {
+  private async calculateCrawlTrust(publicationId: string): Promise<number> {
     // Would integrate with GSC crawl stats
     // For now, estimate based on indexation rate
     const { data: articles } = await supabase
@@ -80,7 +80,7 @@ export class DomainTrustEvolutionEngine {
    * 2. Discovery Speed (0-100): Hours from first crawl to index
    * Lower hours = higher score
    */
-  private async calculateDiscoverySpeed(publicationId: string): number {
+  private async calculateDiscoverySpeed(publicationId: string): Promise<number> {
     const { data: velocity } = await supabase
       .from('velocity_tracking')
       .select('publish_to_crawl_hours')
@@ -99,7 +99,7 @@ export class DomainTrustEvolutionEngine {
    * 3. Index Velocity (0-100): Hours from crawl to index
    * Faster indexing = higher trust
    */
-  private async calculateIndexVelocity(publicationId: string): number {
+  private async calculateIndexVelocity(publicationId: string): Promise<number> {
     const { data: velocity } = await supabase
       .from('velocity_tracking')
       .select('crawl_to_index_hours')
@@ -118,7 +118,7 @@ export class DomainTrustEvolutionEngine {
    * 4. Impression Velocity (0-100): Hours from index to SERP
    * Faster visibility = higher trust
    */
-  private async calculateImpressionVelocity(publicationId: string): number {
+  private async calculateImpressionVelocity(publicationId: string): Promise<number> {
     // Based on average time from index to first impression
     const { data: velocity } = await supabase
       .from('velocity_tracking')
@@ -138,7 +138,7 @@ export class DomainTrustEvolutionEngine {
    * 5. Click Velocity (0-100): Hours from SERP to first click
    * Faster CTR achievement = higher trust
    */
-  private async calculateClickVelocity(publicationId: string): number {
+  private async calculateClickVelocity(publicationId: string): Promise<number> {
     const { data: velocity } = await supabase
       .from('velocity_tracking')
       .select('impression_to_click_hours')
@@ -157,7 +157,7 @@ export class DomainTrustEvolutionEngine {
    * 6. Growth Consistency (0-100): % of weeks showing improvement
    * Consistent growth = higher trust
    */
-  private async calculateGrowthConsistency(publicationId: string): number {
+  private async calculateGrowthConsistency(publicationId: string): Promise<number> {
     const { data: previousMetrics } = await supabase
       .from('domain_trust_metrics')
       .select('week_number, overall_domain_trust')
@@ -180,7 +180,7 @@ export class DomainTrustEvolutionEngine {
   /**
    * 7. Content Freshness (0-100): % of content recently updated
    */
-  private async calculateContentFreshness(publicationId: string): number {
+  private async calculateContentFreshness(publicationId: string): Promise<number> {
     const { data: content } = await supabase
       .from('content_freshness')
       .select('days_since_update')
@@ -195,7 +195,7 @@ export class DomainTrustEvolutionEngine {
   /**
    * 8. Technical Health (0-100): SEO score + Core Web Vitals
    */
-  private async calculateTechnicalHealth(publicationId: string): number {
+  private async calculateTechnicalHealth(publicationId: string): Promise<number> {
     // Would integrate with CWV + SEO audit data
     // For MVP: fixed score based on publication quality
     return 75;
@@ -206,7 +206,7 @@ export class DomainTrustEvolutionEngine {
    */
   private calculateTrend(
     current: number,
-    previous?: number
+    previous?: number | null
   ): { direction: 'up' | 'stable' | 'down'; percentage: number } {
     if (!previous) {
       return { direction: 'stable', percentage: 0 };

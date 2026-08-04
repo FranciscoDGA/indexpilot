@@ -83,9 +83,12 @@ export class IndexNowConnector extends BaseConnector {
       // {siteUrl}/.well-known/IndexNow.txt
       // For now, assume published if we can reach the site
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
       const response = await fetch(`${siteUrl}/.well-known/IndexNow.txt`, {
-        timeout: 5000,
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const content = await response.text();

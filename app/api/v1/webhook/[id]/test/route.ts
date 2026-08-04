@@ -10,7 +10,7 @@ const webhooks = new Map<string, any>();
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await verifyAuth();
@@ -18,7 +18,8 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const webhook = webhooks.get(params.id);
+    const { id } = await params;
+    const webhook = webhooks.get(id);
     if (!webhook) {
       return NextResponse.json(
         { error: 'Webhook not found' },

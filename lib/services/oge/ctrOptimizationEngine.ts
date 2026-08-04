@@ -1,4 +1,3 @@
-import { Database } from '@/types/supabase';
 import { supabase } from '@/lib/supabase/client';
 import { CTRAnalysis, CTRGap } from '@/types/oge';
 

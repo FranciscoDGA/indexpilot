@@ -159,6 +159,8 @@ export class DispatchEngine {
       byProvider: {
         google: 0,
         indexnow: 0,
+        bing: 0,
+        yandex: 0,
       },
       successRate: 0,
     };

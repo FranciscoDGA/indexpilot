@@ -63,7 +63,10 @@ const requestCounts = new Map<string, { count: number; resetAt: number }>();
 
 export function withRateLimit(limit: number = 100, windowMs: number = 60000) {
   return (request: NextRequest, handler: () => Promise<NextResponse>) => {
-    const key = request.headers.get('authorization') || request.ip || 'unknown';
+    const ip = request.headers.get('x-forwarded-for') ||
+               request.headers.get('x-real-ip') ||
+               'unknown';
+    const key = request.headers.get('authorization') || ip;
     const now = Date.now();
 
     let record = requestCounts.get(key);

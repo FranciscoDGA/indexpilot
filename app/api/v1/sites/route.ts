@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Site, SitesResponse } from '@/types/indexPilot';
 import { verifyAuth } from '@/lib/supabase/auth';
-import { crypto } from 'node:crypto';
+import { randomUUID } from 'crypto';
 
 // In-memory storage for sites (would be Prisma in production)
 const sites = new Map<string, Site & { userId: string }>();
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     const site: Site & { userId: string } = {
-      id: `site_${crypto.randomUUID()}`,
+      id: `site_${randomUUID()}`,
       name,
       domain,
       status: 'active',
@@ -101,6 +101,7 @@ export async function GET(request: NextRequest) {
         name: s.name,
         domain: s.domain,
         status: s.status,
+        ownerId: s.ownerId,
         createdAt: s.createdAt,
         updatedAt: s.updatedAt,
       }));
