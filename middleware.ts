@@ -4,6 +4,18 @@ import type { NextRequest } from 'next/server';
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // In mock mode (development), allow access to all routes
+  const useMock = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
+
+  if (useMock) {
+    // Redirect root to dashboard in mock mode
+    if (pathname === '/') {
+      return NextResponse.redirect(new URL('/dashboard', request.url));
+    }
+    // Allow all other routes in mock mode
+    return NextResponse.next();
+  }
+
   // Get session from cookie
   const sessionCookie = request.cookies.get('sb-access-token');
   const hasSession = !!sessionCookie;
