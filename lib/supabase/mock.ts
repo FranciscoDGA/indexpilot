@@ -603,34 +603,73 @@ type QueryBuilder = {
   eq: (field: string, value: any) => QueryBuilder;
   in: (field: string, values: any[]) => QueryBuilder;
   order: (field: string, options?: any) => QueryBuilder;
+  limit: (count: number) => QueryBuilder;
+  range: (from: number, to: number) => QueryBuilder;
   single: () => Promise<{ data: any; error: null }>;
+  then?: (onfulfilled?: any, onrejected?: any) => Promise<any>;
+  catch?: (onrejected?: any) => Promise<any>;
+  finally?: (onfinally?: any) => Promise<any>;
 };
 
-function createQueryBuilder(data: any[]): QueryBuilder {
+function createQueryBuilder(data: any[], options?: { count?: string }): QueryBuilder & Promise<{ data: any; error: null; count?: number }> {
   let filtered = [...data];
+  const initialCount = data.length;
 
-  return {
+  const result: any = {
     eq: (field: string, value: any) => {
       filtered = filtered.filter((d) => d[field] === value);
-      return createQueryBuilder(filtered);
+      return createQueryBuilder(filtered, options);
     },
     in: (field: string, values: any[]) => {
       filtered = filtered.filter((d) => values.includes(d[field]));
-      return createQueryBuilder(filtered);
+      return createQueryBuilder(filtered, options);
     },
-    order: (field: string, options?: any) => {
+    order: (field: string, orderOptions?: any) => {
       filtered.sort((a, b) => {
         const aVal = a[field];
         const bVal = b[field];
-        return options?.ascending === false ? (bVal > aVal ? 1 : -1) : (aVal > bVal ? 1 : -1);
+        return orderOptions?.ascending === false ? (bVal > aVal ? 1 : -1) : (aVal > bVal ? 1 : -1);
       });
-      return createQueryBuilder(filtered);
+      return createQueryBuilder(filtered, options);
+    },
+    limit: (count: number) => {
+      filtered = filtered.slice(0, count);
+      return createQueryBuilder(filtered, options);
+    },
+    range: (from: number, to: number) => {
+      filtered = filtered.slice(from, to + 1);
+      return createQueryBuilder(filtered, options);
     },
     single: async () => ({
       data: filtered[0] || null,
       error: null,
     }),
+    // Make it thenable/awaitable
+    then: (onfulfilled: any, onrejected: any) => {
+      const promise = Promise.resolve({
+        data: filtered,
+        error: null,
+        count: options?.count === 'exact' ? initialCount : undefined,
+      }).then(onfulfilled, onrejected);
+      return promise;
+    },
+    catch: (onrejected: any) => {
+      return Promise.resolve({
+        data: filtered,
+        error: null,
+        count: options?.count === 'exact' ? initialCount : undefined,
+      }).catch(onrejected);
+    },
+    finally: (onfinally: any) => {
+      return Promise.resolve({
+        data: filtered,
+        error: null,
+        count: options?.count === 'exact' ? initialCount : undefined,
+      }).finally(onfinally);
+    },
   };
+
+  return result;
 }
 
 export function createMockSupabaseClient() {
@@ -721,19 +760,27 @@ export function createMockSupabaseClient() {
       }
 
       return {
-        select: () => createQueryBuilder(data),
+        select: (fields?: string, selectOptions?: any) => createQueryBuilder(data, selectOptions),
         insert: async (records: any[]) => ({
           data: records,
           error: null,
         }),
-        update: () => ({
-          eq: () => ({
+        update: async (updates?: any) => ({
+          eq: async () => ({
+            data: null,
+            error: null,
+          }),
+          in: async () => ({
             data: null,
             error: null,
           }),
         }),
         delete: () => ({
-          eq: () => ({
+          eq: async () => ({
+            data: null,
+            error: null,
+          }),
+          in: async () => ({
             data: null,
             error: null,
           }),
