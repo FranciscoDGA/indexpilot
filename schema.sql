@@ -318,3 +318,135 @@ CREATE TRIGGER update_publication_queue_updated_at
     BEFORE UPDATE ON publication_queue
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- SEO_AUDITS TABLE (Sprint 05)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS seo_audits (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    publication_id UUID NOT NULL REFERENCES publication_queue(id) ON DELETE CASCADE,
+    site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+    url VARCHAR(2000) NOT NULL,
+    title VARCHAR(255),
+    description TEXT,
+
+    score INTEGER NOT NULL DEFAULT 0,
+    grade VARCHAR(2) NOT NULL DEFAULT 'D' CHECK (grade IN ('A+', 'A', 'B', 'C', 'D')),
+
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'scanning', 'completed', 'error')),
+    error_message TEXT,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    scanned_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX idx_seo_audits_publication_id ON seo_audits(publication_id);
+CREATE INDEX idx_seo_audits_site_id ON seo_audits(site_id);
+CREATE INDEX idx_seo_audits_user_id ON seo_audits(user_id);
+CREATE INDEX idx_seo_audits_score ON seo_audits(site_id, score DESC);
+CREATE INDEX idx_seo_audits_created_at ON seo_audits(site_id, created_at DESC);
+
+-- ============================================
+-- SEO_CHECKS TABLE (Sprint 05)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS seo_checks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    audit_id UUID NOT NULL REFERENCES seo_audits(id) ON DELETE CASCADE,
+
+    check_name VARCHAR(50) NOT NULL,
+    status VARCHAR(20) NOT NULL CHECK (status IN ('PASS', 'WARNING', 'ERROR', 'INFO')),
+    severity VARCHAR(20) NOT NULL CHECK (severity IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
+
+    message TEXT NOT NULL,
+    recommendation TEXT,
+
+    details JSONB,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_seo_checks_audit_id ON seo_checks(audit_id);
+CREATE INDEX idx_seo_checks_status ON seo_checks(audit_id, status);
+CREATE INDEX idx_seo_checks_severity ON seo_checks(audit_id, severity);
+
+-- ============================================
+-- SEO_AUDIT_HISTORY TABLE (Sprint 05)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS seo_audit_history (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    publication_id UUID NOT NULL REFERENCES publication_queue(id) ON DELETE CASCADE,
+    site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+    score_at_date TIMESTAMP WITH TIME ZONE NOT NULL,
+    score INTEGER NOT NULL,
+    grade VARCHAR(2) NOT NULL CHECK (grade IN ('A+', 'A', 'B', 'C', 'D')),
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_seo_audit_history_publication ON seo_audit_history(publication_id, created_at DESC);
+CREATE INDEX idx_seo_audit_history_site ON seo_audit_history(site_id, created_at DESC);
+CREATE INDEX idx_seo_audit_history_date ON seo_audit_history(score_at_date DESC);
+
+-- ============================================
+-- ENABLE RLS FOR SEO TABLES
+-- ============================================
+
+ALTER TABLE seo_audits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE seo_checks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE seo_audit_history ENABLE ROW LEVEL SECURITY;
+
+-- SEO Audits: Users can only access audits for their sites
+CREATE POLICY "Users can view own seo audits"
+    ON seo_audits FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own seo audits"
+    ON seo_audits FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own seo audits"
+    ON seo_audits FOR UPDATE
+    USING (auth.uid() = user_id);
+
+-- SEO Checks: Users can only access checks for their audits
+CREATE POLICY "Users can view own seo checks"
+    ON seo_checks FOR SELECT
+    USING (
+        audit_id IN (
+            SELECT id FROM seo_audits WHERE user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can insert own seo checks"
+    ON seo_checks FOR INSERT
+    WITH CHECK (
+        audit_id IN (
+            SELECT id FROM seo_audits WHERE user_id = auth.uid()
+        )
+    );
+
+-- SEO Audit History: Users can only access history for their audits
+CREATE POLICY "Users can view own seo audit history"
+    ON seo_audit_history FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own seo audit history"
+    ON seo_audit_history FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+-- ============================================
+-- TRIGGER FOR SEO_AUDITS
+-- ============================================
+
+CREATE TRIGGER update_seo_audits_updated_at
+    BEFORE UPDATE ON seo_audits
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
