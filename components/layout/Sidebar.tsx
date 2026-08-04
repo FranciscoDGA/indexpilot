@@ -9,6 +9,7 @@ const navItems = [
   { href: '/publications', label: 'Publicações', icon: '📝' },
   { href: '/seo', label: 'SEO Inspector', icon: '🔍' },
   { href: '/seo/compare', label: 'Comparar URLs', icon: '⚖️', indent: true },
+  { href: '/performance', label: 'Performance', icon: '📈' },
   { href: '/api-keys', label: 'API Keys', icon: '🔑' },
   { href: '/settings', label: 'Configurações', icon: '⚙️' },
 ];
