@@ -123,3 +123,6 @@ export interface SiteDashboardMetrics {
 
 // Re-export Sprint 11 Connector Types
 export * from './connectors';
+
+// Re-export Sprint 12 Platform Types
+export * from './platform';

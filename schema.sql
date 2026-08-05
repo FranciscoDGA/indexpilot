@@ -1104,3 +1104,226 @@ CREATE TRIGGER update_connectors_updated_at
     BEFORE UPDATE ON connectors
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- SPRINT 12: DEVELOPER PLATFORM TABLES
+-- ============================================
+
+-- API Clients (OAuth apps / API key holders)
+CREATE TABLE IF NOT EXISTS api_clients (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workspace_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    client_id VARCHAR(255) UNIQUE NOT NULL,
+    client_secret_hash VARCHAR(512),
+    redirect_uri TEXT,
+    scopes TEXT[] DEFAULT ARRAY['read'],
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'revoked')),
+    rate_limit_tier VARCHAR(20) DEFAULT 'free' CHECK (rate_limit_tier IN ('free', 'starter', 'pro', 'enterprise')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- API Tokens (access tokens for API clients)
+CREATE TABLE IF NOT EXISTS api_tokens (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    client_id UUID NOT NULL REFERENCES api_clients(id) ON DELETE CASCADE,
+    token_hash VARCHAR(512) NOT NULL,
+    token_prefix VARCHAR(10) NOT NULL,
+    scopes TEXT[] DEFAULT ARRAY['read'],
+    expires_at TIMESTAMP WITH TIME ZONE,
+    last_used_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- API Request Logs
+CREATE TABLE IF NOT EXISTS api_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    client_id UUID REFERENCES api_clients(id) ON DELETE SET NULL,
+    endpoint VARCHAR(512) NOT NULL,
+    method VARCHAR(10) NOT NULL,
+    status_code INTEGER,
+    latency_ms INTEGER,
+    request_size_bytes INTEGER,
+    response_size_bytes INTEGER,
+    ip_address INET,
+    user_agent TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Webhook Subscriptions
+CREATE TABLE IF NOT EXISTS webhook_subscriptions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workspace_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    url TEXT NOT NULL,
+    secret VARCHAR(255) NOT NULL,
+    events TEXT[] NOT NULL DEFAULT ARRAY['url.created'],
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'paused', 'failed')),
+    failure_count INTEGER DEFAULT 0,
+    last_triggered_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Webhook Deliveries
+CREATE TABLE IF NOT EXISTS webhook_deliveries (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    subscription_id UUID NOT NULL REFERENCES webhook_subscriptions(id) ON DELETE CASCADE,
+    event VARCHAR(100) NOT NULL,
+    payload JSONB NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'delivered', 'failed', 'retrying')),
+    attempts INTEGER DEFAULT 0,
+    max_attempts INTEGER DEFAULT 5,
+    last_attempt_at TIMESTAMP WITH TIME ZONE,
+    delivered_at TIMESTAMP WITH TIME ZONE,
+    response_status INTEGER,
+    error_message TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Event Bus Events
+CREATE TABLE IF NOT EXISTS platform_events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workspace_id UUID REFERENCES sites(id) ON DELETE CASCADE,
+    event_type VARCHAR(100) NOT NULL,
+    payload JSONB NOT NULL DEFAULT '{}',
+    metadata JSONB DEFAULT '{}',
+    published_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    processed BOOLEAN DEFAULT FALSE
+);
+
+-- Developer Applications (OAuth)
+CREATE TABLE IF NOT EXISTS developer_apps (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workspace_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    app_id VARCHAR(255) UNIQUE NOT NULL,
+    app_secret_hash VARCHAR(512),
+    redirect_uris TEXT[] NOT NULL,
+    scopes TEXT[] NOT NULL DEFAULT ARRAY['read:sites'],
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'revoked')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- OAuth Authorization Codes
+CREATE TABLE IF NOT EXISTS oauth_codes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    app_id UUID NOT NULL REFERENCES developer_apps(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    code VARCHAR(255) UNIQUE NOT NULL,
+    redirect_uri TEXT NOT NULL,
+    scopes TEXT[] NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- OAuth Tokens
+CREATE TABLE IF NOT EXISTS oauth_tokens (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    app_id UUID NOT NULL REFERENCES developer_apps(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    access_token_hash VARCHAR(512) NOT NULL,
+    refresh_token_hash VARCHAR(512),
+    token_type VARCHAR(20) DEFAULT 'Bearer',
+    scopes TEXT[] NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    revoked_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- INDEXES FOR SPRINT 12
+-- ============================================
+
+CREATE INDEX IF NOT EXISTS idx_api_clients_workspace ON api_clients(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_api_clients_client_id ON api_clients(client_id);
+CREATE INDEX IF NOT EXISTS idx_api_tokens_client ON api_tokens(client_id);
+CREATE INDEX IF NOT EXISTS idx_api_tokens_hash ON api_tokens(token_hash);
+CREATE INDEX IF NOT EXISTS idx_api_requests_client ON api_requests(client_id);
+CREATE INDEX IF NOT EXISTS idx_api_requests_created ON api_requests(created_at);
+CREATE INDEX IF NOT EXISTS idx_webhook_subscriptions_workspace ON webhook_subscriptions(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_subscription ON webhook_deliveries(subscription_id);
+CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_status ON webhook_deliveries(status);
+CREATE INDEX IF NOT EXISTS idx_platform_events_workspace ON platform_events(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_platform_events_type ON platform_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_platform_events_published ON platform_events(published_at);
+CREATE INDEX IF NOT EXISTS idx_developer_apps_workspace ON developer_apps(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_developer_apps_app_id ON developer_apps(app_id);
+CREATE INDEX IF NOT EXISTS idx_oauth_codes_code ON oauth_codes(code);
+CREATE INDEX IF NOT EXISTS idx_oauth_tokens_hash ON oauth_tokens(access_token_hash);
+
+-- ============================================
+-- RLS POLICIES FOR SPRINT 12
+-- ============================================
+
+-- API Clients
+CREATE POLICY "Users can view own api clients"
+    ON api_clients FOR SELECT
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own api clients"
+    ON api_clients FOR ALL
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+-- API Tokens
+CREATE POLICY "Users can view own api tokens"
+    ON api_tokens FOR SELECT
+    USING (client_id IN (
+        SELECT id FROM api_clients WHERE workspace_id IN (
+            SELECT id FROM sites WHERE user_id = auth.uid()
+        )
+    ));
+
+-- Webhook Subscriptions
+CREATE POLICY "Users can view own webhook subscriptions"
+    ON webhook_subscriptions FOR SELECT
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own webhook subscriptions"
+    ON webhook_subscriptions FOR ALL
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+-- Webhook Deliveries
+CREATE POLICY "Users can view own webhook deliveries"
+    ON webhook_deliveries FOR SELECT
+    USING (subscription_id IN (
+        SELECT id FROM webhook_subscriptions WHERE workspace_id IN (
+            SELECT id FROM sites WHERE user_id = auth.uid()
+        )
+    ));
+
+-- Platform Events
+CREATE POLICY "Users can view own platform events"
+    ON platform_events FOR SELECT
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+-- Developer Apps
+CREATE POLICY "Users can view own developer apps"
+    ON developer_apps FOR SELECT
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own developer apps"
+    ON developer_apps FOR ALL
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+-- ============================================
+-- TRIGGERS FOR SPRINT 12
+-- ============================================
+
+CREATE TRIGGER update_api_clients_updated_at
+    BEFORE UPDATE ON api_clients
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_webhook_subscriptions_updated_at
+    BEFORE UPDATE ON webhook_subscriptions
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_developer_apps_updated_at
+    BEFORE UPDATE ON developer_apps
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
