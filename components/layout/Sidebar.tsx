@@ -21,6 +21,14 @@ import {
   GitCompare,
   Star,
   AlertTriangle,
+  TrendingUp,
+  Database,
+  LineChart,
+  SearchCode,
+  Cpu,
+  DollarSign,
+  Compass,
+  TestTube2,
 } from 'lucide-react';
 
 interface NavItem {
@@ -51,6 +59,14 @@ const navItems: NavItem[] = [
 
   { href: '/discovery', label: 'Site Discovery', icon: <Radar size={18} />, section: 'Ferramentas' },
   { href: '/reports', label: 'Relatórios', icon: <FileBarChart size={18} /> },
+
+  { href: '/analytics', label: 'Executive Analytics', icon: <TrendingUp size={18} />, section: 'Data Warehouse & BI' },
+  { href: '/analytics/seo', label: 'SEO Analytics', icon: <SearchCode size={18} />, indent: true },
+  { href: '/analytics/content', label: 'Content Analytics', icon: <Database size={18} />, indent: true },
+  { href: '/analytics/competitors', label: 'Competitor Analytics', icon: <Compass size={18} />, indent: true },
+  { href: '/analytics/financial', label: 'Financial Analytics', icon: <DollarSign size={18} />, indent: true },
+  { href: '/analytics/ai', label: 'AI Analytics', icon: <Cpu size={18} />, indent: true },
+  { href: '/analytics/data-explorer', label: 'Data Explorer', icon: <TestTube2 size={18} />, indent: true },
 
   { href: '/api-keys', label: 'API Keys', icon: <KeyRound size={18} />, section: 'Sistema' },
   { href: '/alert-preferences', label: 'Preferências', icon: <Bell size={18} /> },

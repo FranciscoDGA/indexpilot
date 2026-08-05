@@ -2427,3 +2427,1517 @@ CREATE TRIGGER update_white_label_configs_updated_at
     BEFORE UPDATE ON white_label_configs
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- SPRINT 17: BILLING, SUBSCRIPTION & USAGE MANAGEMENT
+-- ============================================
+
+-- ============================================
+-- PLANS (subscription plans)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS plans (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    slug VARCHAR(100) UNIQUE NOT NULL,
+    description TEXT,
+    price_monthly NUMERIC(10,2) NOT NULL DEFAULT 0,
+    price_yearly NUMERIC(10,2) NOT NULL DEFAULT 0,
+    currency VARCHAR(3) DEFAULT 'USD',
+    billing_cycle VARCHAR(20) DEFAULT 'monthly' CHECK (billing_cycle IN ('monthly', 'yearly', 'one_time')),
+    features JSONB DEFAULT '{}',
+    limits JSONB DEFAULT '{}',
+    is_active BOOLEAN DEFAULT TRUE,
+    is_popular BOOLEAN DEFAULT FALSE,
+    trial_days INTEGER DEFAULT 14,
+    sort_order INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- SUBSCRIPTIONS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    plan_id UUID NOT NULL REFERENCES plans(id),
+    status VARCHAR(20) DEFAULT 'trial' CHECK (status IN ('trial', 'active', 'past_due', 'cancelled', 'expired', 'paused')),
+    billing_cycle VARCHAR(20) DEFAULT 'monthly' CHECK (billing_cycle IN ('monthly', 'yearly')),
+    trial_started_at TIMESTAMP WITH TIME ZONE,
+    trial_ends_at TIMESTAMP WITH TIME ZONE,
+    started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    current_period_start TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    current_period_end TIMESTAMP WITH TIME ZONE,
+    renewal_at TIMESTAMP WITH TIME ZONE,
+    cancelled_at TIMESTAMP WITH TIME ZONE,
+    cancel_at_period_end BOOLEAN DEFAULT FALSE,
+    payment_method_id VARCHAR(255),
+    external_subscription_id VARCHAR(255),
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- USAGE RECORDS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS usage_records (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    subscription_id UUID REFERENCES subscriptions(id) ON DELETE SET NULL,
+    resource VARCHAR(50) NOT NULL CHECK (resource IN ('urls', 'crawls', 'indexations', 'ai_queries', 'api_calls', 'storage_gb', 'users', 'competitors', 'monitoring')),
+    quantity INTEGER NOT NULL DEFAULT 1,
+    unit_cost NUMERIC(10,4) DEFAULT 0,
+    total_cost NUMERIC(10,4) DEFAULT 0,
+    period_start TIMESTAMP WITH TIME ZONE,
+    period_end TIMESTAMP WITH TIME ZONE,
+    recorded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    metadata JSONB DEFAULT '{}'
+);
+
+-- ============================================
+-- INVOICES
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS invoices (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    subscription_id UUID REFERENCES subscriptions(id) ON DELETE SET NULL,
+    invoice_number VARCHAR(50) UNIQUE NOT NULL,
+    status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'pending', 'paid', 'overdue', 'cancelled', 'refunded')),
+    currency VARCHAR(3) DEFAULT 'USD',
+    subtotal NUMERIC(10,2) NOT NULL DEFAULT 0,
+    discount NUMERIC(10,2) DEFAULT 0,
+    tax NUMERIC(10,2) DEFAULT 0,
+    total NUMERIC(10,2) NOT NULL DEFAULT 0,
+    amount_paid NUMERIC(10,2) DEFAULT 0,
+    amount_due NUMERIC(10,2) DEFAULT 0,
+    due_date DATE,
+    paid_at TIMESTAMP WITH TIME ZONE,
+    period_start TIMESTAMP WITH TIME ZONE,
+    period_end TIMESTAMP WITH TIME ZONE,
+    billing_reason VARCHAR(50) CHECK (billing_reason IN ('subscription_create', 'subscription_cycle', 'subscription_update', 'manual')),
+    line_items JSONB DEFAULT '[]',
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- PAYMENTS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS payments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    invoice_id UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    provider VARCHAR(50) NOT NULL CHECK (provider IN ('stripe', 'mercadopago', 'paypal', 'manual')),
+    transaction_id VARCHAR(255),
+    amount NUMERIC(10,2) NOT NULL,
+    currency VARCHAR(3) DEFAULT 'USD',
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'succeeded', 'failed', 'refunded', 'partially_refunded')),
+    payment_method VARCHAR(50),
+    payment_method_last4 VARCHAR(4),
+    payment_method_brand VARCHAR(20),
+    refund_amount NUMERIC(10,2) DEFAULT 0,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- COUPONS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS coupons (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    code VARCHAR(50) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    type VARCHAR(20) NOT NULL CHECK (type IN ('percentage', 'fixed_amount', 'trial_extension', 'free_upgrade')),
+    value NUMERIC(10,2) NOT NULL DEFAULT 0,
+    currency VARCHAR(3) DEFAULT 'USD',
+    max_uses INTEGER,
+    used_count INTEGER DEFAULT 0,
+    applies_to_plans UUID[],
+    first_payment_only BOOLEAN DEFAULT FALSE,
+    min_amount NUMERIC(10,2) DEFAULT 0,
+    starts_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    expires_at TIMESTAMP WITH TIME ZONE,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- COUPON USAGE
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS coupon_usage (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    coupon_id UUID NOT NULL REFERENCES coupons(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    invoice_id UUID REFERENCES invoices(id) ON DELETE SET NULL,
+    discount_amount NUMERIC(10,2) NOT NULL,
+    used_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- PAYMENT METHODS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS payment_methods (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    provider VARCHAR(50) NOT NULL,
+    external_id VARCHAR(255),
+    type VARCHAR(20) DEFAULT 'card' CHECK (type IN ('card', 'bank_account', 'wallet')),
+    brand VARCHAR(20),
+    last4 VARCHAR(4),
+    exp_month INTEGER,
+    exp_year INTEGER,
+    is_default BOOLEAN DEFAULT FALSE,
+    billing_details JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- WEBHOOK EVENTS (payment provider)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS billing_webhook_events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    provider VARCHAR(50) NOT NULL,
+    event_type VARCHAR(100) NOT NULL,
+    external_id VARCHAR(255),
+    payload JSONB NOT NULL,
+    processed BOOLEAN DEFAULT FALSE,
+    processed_at TIMESTAMP WITH TIME ZONE,
+    error_message TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- REVENUE ANALYTICS (aggregated)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS revenue_analytics (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    period DATE NOT NULL,
+    mrr NUMERIC(10,2) DEFAULT 0,
+    arr NUMERIC(10,2) DEFAULT 0,
+    new_revenue NUMERIC(10,2) DEFAULT 0,
+    expansion_revenue NUMERIC(10,2) DEFAULT 0,
+    churned_revenue NUMERIC(10,2) DEFAULT 0,
+    net_revenue NUMERIC(10,2) DEFAULT 0,
+    active_subscriptions INTEGER DEFAULT 0,
+    new_subscriptions INTEGER DEFAULT 0,
+    cancelled_subscriptions INTEGER DEFAULT 0,
+    churn_rate NUMERIC(5,2) DEFAULT 0,
+    avg_revenue_per_user NUMERIC(10,2) DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(period)
+);
+
+-- ============================================
+-- ENTERPRISE CONTRACTS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS enterprise_contracts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    contract_number VARCHAR(50) UNIQUE NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'expired', 'terminated')),
+    start_date DATE NOT NULL,
+    end_date DATE,
+    annual_value NUMERIC(10,2) NOT NULL,
+    payment_terms VARCHAR(50) DEFAULT 'net30',
+    custom_limits JSONB DEFAULT '{}',
+    sla_config JSONB DEFAULT '{}',
+    billing_frequency VARCHAR(20) DEFAULT 'monthly' CHECK (billing_frequency IN ('monthly', 'quarterly', 'annually')),
+    auto_renew BOOLEAN DEFAULT TRUE,
+    signed_at TIMESTAMP WITH TIME ZONE,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- INDEXES FOR SPRINT 17
+-- ============================================
+
+CREATE INDEX IF NOT EXISTS idx_plans_slug ON plans(slug);
+CREATE INDEX IF NOT EXISTS idx_plans_active ON plans(is_active);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_tenant ON subscriptions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_plan ON subscriptions(plan_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status);
+CREATE INDEX IF NOT EXISTS idx_usage_records_tenant ON usage_records(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_usage_records_resource ON usage_records(resource);
+CREATE INDEX IF NOT EXISTS idx_usage_records_recorded ON usage_records(recorded_at);
+CREATE INDEX IF NOT EXISTS idx_invoices_tenant ON invoices(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
+CREATE INDEX IF NOT EXISTS idx_invoices_number ON invoices(invoice_number);
+CREATE INDEX IF NOT EXISTS idx_payments_invoice ON payments(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_payments_tenant ON payments(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
+CREATE INDEX IF NOT EXISTS idx_coupons_code ON coupons(code);
+CREATE INDEX IF NOT EXISTS idx_coupon_usage_coupon ON coupon_usage(coupon_id);
+CREATE INDEX IF NOT EXISTS idx_coupon_usage_tenant ON coupon_usage(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_payment_methods_tenant ON payment_methods(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_billing_webhook_events_provider ON billing_webhook_events(provider);
+CREATE INDEX IF NOT EXISTS idx_billing_webhook_events_type ON billing_webhook_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_revenue_analytics_period ON revenue_analytics(period);
+CREATE INDEX IF NOT EXISTS idx_enterprise_contracts_tenant ON enterprise_contracts(tenant_id);
+
+-- ============================================
+-- RLS POLICIES FOR SPRINT 17
+-- ============================================
+
+-- Plans (public read)
+CREATE POLICY "Anyone can view active plans"
+    ON plans FOR SELECT
+    USING (is_active = TRUE);
+
+-- Subscriptions
+CREATE POLICY "Users can view own subscription"
+    ON subscriptions FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own subscription"
+    ON subscriptions FOR ALL
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- Usage Records
+CREATE POLICY "Users can view own usage"
+    ON usage_records FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- Invoices
+CREATE POLICY "Users can view own invoices"
+    ON invoices FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- Payments
+CREATE POLICY "Users can view own payments"
+    ON payments FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- Coupons (public read for validation)
+CREATE POLICY "Anyone can view active coupons"
+    ON coupons FOR SELECT
+    USING (is_active = TRUE);
+
+-- Coupon Usage
+CREATE POLICY "Users can view own coupon usage"
+    ON coupon_usage FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- Payment Methods
+CREATE POLICY "Users can view own payment methods"
+    ON payment_methods FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- Revenue Analytics (admin only)
+CREATE POLICY "Admins can view revenue analytics"
+    ON revenue_analytics FOR SELECT
+    USING (EXISTS (
+        SELECT 1 FROM user_roles ur
+        JOIN roles r ON ur.role_id = r.id
+        WHERE ur.user_id = auth.uid()
+        AND r.name IN ('Tenant Admin', 'Super Admin')
+    ));
+
+-- Enterprise Contracts
+CREATE POLICY "Users can view own contracts"
+    ON enterprise_contracts FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- ============================================
+-- TRIGGERS FOR SPRINT 17
+-- ============================================
+
+CREATE TRIGGER update_plans_updated_at
+    BEFORE UPDATE ON plans
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_subscriptions_updated_at
+    BEFORE UPDATE ON subscriptions
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_invoices_updated_at
+    BEFORE UPDATE ON invoices
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_payments_updated_at
+    BEFORE UPDATE ON payments
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_coupons_updated_at
+    BEFORE UPDATE ON coupons
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_enterprise_contracts_updated_at
+    BEFORE UPDATE ON enterprise_contracts
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- SPRINT 18: EXTENSION MARKETPLACE & AUTOMATION HUB
+-- ============================================
+
+-- Marketplace Categories
+CREATE TABLE IF NOT EXISTS marketplace_categories (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL UNIQUE,
+    slug VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    icon VARCHAR(50),
+    sort_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Extensions (marketplace items)
+CREATE TABLE IF NOT EXISTS extensions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) NOT NULL UNIQUE,
+    developer_id UUID,
+    category_id UUID REFERENCES marketplace_categories(id),
+    type VARCHAR(30) NOT NULL CHECK (type IN ('plugin', 'connector', 'ai_agent', 'workflow', 'template', 'prompt_pack')),
+    short_description TEXT,
+    long_description TEXT,
+    icon_url TEXT,
+    screenshot_urls TEXT[],
+    version VARCHAR(20) NOT NULL,
+    status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'pending_review', 'published', 'suspended', 'archived')),
+    license_type VARCHAR(30) DEFAULT 'free' CHECK (license_type IN ('free', 'paid', 'freemium', 'subscription')),
+    price_monthly NUMERIC(10,2) DEFAULT 0,
+    price_one_time NUMERIC(10,2) DEFAULT 0,
+    currency VARCHAR(3) DEFAULT 'USD',
+    downloads_count INTEGER DEFAULT 0,
+    installs_count INTEGER DEFAULT 0,
+    active_installs_count INTEGER DEFAULT 0,
+    rating_avg NUMERIC(3,2) DEFAULT 0,
+    rating_count INTEGER DEFAULT 0,
+    manifest JSONB DEFAULT '{}',
+    permissions TEXT[],
+    required_plan VARCHAR(50),
+    compatibility JSONB DEFAULT '{}',
+    changelog TEXT,
+    repository_url TEXT,
+    documentation_url TEXT,
+    support_url TEXT,
+    tags TEXT[],
+    is_featured BOOLEAN DEFAULT FALSE,
+    is_official BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_extensions_category ON extensions(category_id);
+CREATE INDEX idx_extensions_developer ON extensions(developer_id);
+CREATE INDEX idx_extensions_type ON extensions(type);
+CREATE INDEX idx_extensions_status ON extensions(status);
+CREATE INDEX idx_extensions_featured ON extensions(is_featured) WHERE is_featured = TRUE;
+
+-- Extension Versions
+CREATE TABLE IF NOT EXISTS extension_versions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    extension_id UUID NOT NULL REFERENCES extensions(id) ON DELETE CASCADE,
+    version VARCHAR(20) NOT NULL,
+    manifest JSONB DEFAULT '{}',
+    changelog TEXT,
+    signature TEXT,
+    package_url TEXT,
+    package_size_bytes BIGINT DEFAULT 0,
+    min_platform_version VARCHAR(20),
+    breaking_changes TEXT[],
+    published_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(extension_id, version)
+);
+
+CREATE INDEX idx_extension_versions_ext ON extension_versions(extension_id);
+
+-- Extension Installs
+CREATE TABLE IF NOT EXISTS extension_installs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL,
+    extension_id UUID NOT NULL REFERENCES extensions(id) ON DELETE CASCADE,
+    version VARCHAR(20) NOT NULL,
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'disabled', 'uninstalled')),
+    config JSONB DEFAULT '{}',
+    permissions_granted TEXT[],
+    installed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(tenant_id, extension_id)
+);
+
+CREATE INDEX idx_extension_installs_tenant ON extension_installs(tenant_id);
+CREATE INDEX idx_extension_installs_ext ON extension_installs(extension_id);
+
+-- Extension Reviews
+CREATE TABLE IF NOT EXISTS extension_reviews (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    extension_id UUID NOT NULL REFERENCES extensions(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL,
+    tenant_id UUID,
+    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    title VARCHAR(255),
+    comment TEXT,
+    version_reviewed VARCHAR(20),
+    helpful_count INTEGER DEFAULT 0,
+    is_verified_install BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(extension_id, user_id)
+);
+
+CREATE INDEX idx_extension_reviews_ext ON extension_reviews(extension_id);
+
+-- Extension Events (audit)
+CREATE TABLE IF NOT EXISTS extension_events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    extension_id UUID NOT NULL REFERENCES extensions(id) ON DELETE CASCADE,
+    tenant_id UUID,
+    user_id UUID,
+    event_type VARCHAR(50) NOT NULL,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_extension_events_ext ON extension_events(extension_id);
+CREATE INDEX idx_extension_events_tenant ON extension_events(tenant_id);
+
+-- Extension Analytics
+CREATE TABLE IF NOT EXISTS extension_analytics (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    extension_id UUID NOT NULL REFERENCES extensions(id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    downloads INTEGER DEFAULT 0,
+    installs INTEGER DEFAULT 0,
+    uninstalls INTEGER DEFAULT 0,
+    active_users INTEGER DEFAULT 0,
+    errors_count INTEGER DEFAULT 0,
+    avg_load_time_ms NUMERIC(10,2) DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(extension_id, date)
+);
+
+CREATE INDEX idx_extension_analytics_ext_date ON extension_analytics(extension_id, date DESC);
+
+-- Developer Accounts
+CREATE TABLE IF NOT EXISTS developer_accounts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL UNIQUE,
+    display_name VARCHAR(255) NOT NULL,
+    bio TEXT,
+    avatar_url TEXT,
+    website_url TEXT,
+    github_url TEXT,
+    verified BOOLEAN DEFAULT FALSE,
+    total_downloads INTEGER DEFAULT 0,
+    total_revenue NUMERIC(12,2) DEFAULT 0,
+    payout_method VARCHAR(50),
+    payout_email VARCHAR(255),
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'pending_verification')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Developer Apps (API credentials for extensions)
+CREATE TABLE IF NOT EXISTS developer_apps (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    developer_id UUID NOT NULL REFERENCES developer_accounts(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    app_key VARCHAR(255) NOT NULL UNIQUE,
+    app_secret VARCHAR(255) NOT NULL,
+    redirect_uris TEXT[],
+    scopes TEXT[],
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'revoked')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_developer_apps_dev ON developer_apps(developer_id);
+
+-- Workflows (Automation Hub)
+CREATE TABLE IF NOT EXISTS workflows (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    trigger_type VARCHAR(50) NOT NULL,
+    trigger_config JSONB DEFAULT '{}',
+    steps JSONB DEFAULT '[]',
+    variables JSONB DEFAULT '{}',
+    status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'paused', 'archived')),
+    is_template BOOLEAN DEFAULT FALSE,
+    is_public BOOLEAN DEFAULT FALSE,
+    author_id UUID,
+    category VARCHAR(100),
+    tags TEXT[],
+    downloads_count INTEGER DEFAULT 0,
+    runs_count INTEGER DEFAULT 0,
+    success_rate NUMERIC(5,2) DEFAULT 100,
+    avg_duration_ms INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_workflows_tenant ON workflows(tenant_id);
+CREATE INDEX idx_workflows_template ON workflows(is_template) WHERE is_template = TRUE;
+CREATE INDEX idx_workflows_public ON workflows(is_public) WHERE is_public = TRUE;
+
+-- Workflow Runs
+CREATE TABLE IF NOT EXISTS workflow_runs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workflow_id UUID NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL,
+    status VARCHAR(20) DEFAULT 'running' CHECK (status IN ('running', 'completed', 'failed', 'cancelled')),
+    trigger_data JSONB DEFAULT '{}',
+    step_results JSONB DEFAULT '[]',
+    error_message TEXT,
+    started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    completed_at TIMESTAMP WITH TIME ZONE,
+    duration_ms INTEGER
+);
+
+CREATE INDEX idx_workflow_runs_workflow ON workflow_runs(workflow_id);
+CREATE INDEX idx_workflow_runs_tenant ON workflow_runs(tenant_id);
+CREATE INDEX idx_workflow_runs_status ON workflow_runs(status);
+
+-- AI Agents (Agent Marketplace)
+CREATE TABLE IF NOT EXISTS ai_agents (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) NOT NULL UNIQUE,
+    developer_id UUID,
+    category VARCHAR(100) NOT NULL,
+    description TEXT,
+    long_description TEXT,
+    icon_url TEXT,
+    version VARCHAR(20) NOT NULL,
+    status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'pending_review', 'published', 'suspended')),
+    license_type VARCHAR(30) DEFAULT 'free' CHECK (license_type IN ('free', 'paid', 'freemium')),
+    price_monthly NUMERIC(10,2) DEFAULT 0,
+    system_prompt TEXT,
+    capabilities TEXT[],
+    required_permissions TEXT[],
+    supported_models TEXT[],
+    input_types TEXT[],
+    output_types TEXT[],
+    config_schema JSONB DEFAULT '{}',
+    max_context_tokens INTEGER DEFAULT 4096,
+    rating_avg NUMERIC(3,2) DEFAULT 0,
+    rating_count INTEGER DEFAULT 0,
+    installs_count INTEGER DEFAULT 0,
+    runs_count INTEGER DEFAULT 0,
+    tags TEXT[],
+    is_featured BOOLEAN DEFAULT FALSE,
+    is_official BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_ai_agents_category ON ai_agents(category);
+CREATE INDEX idx_ai_agents_status ON ai_agents(status);
+CREATE INDEX idx_ai_agents_featured ON ai_agents(is_featured) WHERE is_featured = TRUE;
+
+-- AI Agent Installs
+CREATE TABLE IF NOT EXISTS ai_agent_installs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL,
+    agent_id UUID NOT NULL REFERENCES ai_agents(id) ON DELETE CASCADE,
+    config JSONB DEFAULT '{}',
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'disabled')),
+    installed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(tenant_id, agent_id)
+);
+
+CREATE INDEX idx_ai_agent_installs_tenant ON ai_agent_installs(tenant_id);
+
+-- AI Agent Runs
+CREATE TABLE IF NOT EXISTS ai_agent_runs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    agent_id UUID NOT NULL REFERENCES ai_agents(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL,
+    user_id UUID,
+    input_data JSONB DEFAULT '{}',
+    output_data JSONB DEFAULT '{}',
+    model_used VARCHAR(100),
+    tokens_input INTEGER DEFAULT 0,
+    tokens_output INTEGER DEFAULT 0,
+    cost NUMERIC(8,6) DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'completed' CHECK (status IN ('pending', 'running', 'completed', 'failed')),
+    error_message TEXT,
+    duration_ms INTEGER,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_ai_agent_runs_agent ON ai_agent_runs(agent_id);
+CREATE INDEX idx_ai_agent_runs_tenant ON ai_agent_runs(tenant_id);
+
+-- Templates
+CREATE TABLE IF NOT EXISTS templates (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) NOT NULL UNIQUE,
+    category VARCHAR(100) NOT NULL,
+    description TEXT,
+    author_id UUID,
+    content JSONB DEFAULT '{}',
+    preview_url TEXT,
+    screenshot_urls TEXT[],
+    downloads_count INTEGER DEFAULT 0,
+    rating_avg NUMERIC(3,2) DEFAULT 0,
+    rating_count INTEGER DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'published' CHECK (status IN ('draft', 'published', 'archived')),
+    tags TEXT[],
+    is_official BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_templates_category ON templates(category);
+CREATE INDEX idx_templates_status ON templates(status);
+
+-- Template Installs
+CREATE TABLE IF NOT EXISTS template_installs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL,
+    template_id UUID NOT NULL REFERENCES templates(id) ON DELETE CASCADE,
+    customizations JSONB DEFAULT '{}',
+    installed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(tenant_id, template_id)
+);
+
+-- Prompt Library
+CREATE TABLE IF NOT EXISTS prompt_library (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    content TEXT NOT NULL,
+    category VARCHAR(100) NOT NULL,
+    subcategory VARCHAR(100),
+    author_id UUID,
+    language VARCHAR(10) DEFAULT 'en',
+    variables JSONB DEFAULT '[]',
+    compatible_agents UUID[],
+    usage_count INTEGER DEFAULT 0,
+    rating_avg NUMERIC(3,2) DEFAULT 0,
+    rating_count INTEGER DEFAULT 0,
+    is_public BOOLEAN DEFAULT TRUE,
+    tags TEXT[],
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_prompt_library_category ON prompt_library(category);
+CREATE INDEX idx_prompt_library_language ON prompt_library(language);
+
+-- Extension Permissions Definitions
+CREATE TABLE IF NOT EXISTS extension_permission_definitions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    extension_id UUID NOT NULL REFERENCES extensions(id) ON DELETE CASCADE,
+    permission_key VARCHAR(100) NOT NULL,
+    permission_name VARCHAR(255) NOT NULL,
+    description TEXT,
+    scope VARCHAR(50) NOT NULL CHECK (scope IN ('read', 'write', 'admin')),
+    resource VARCHAR(100) NOT NULL,
+    is_dangerous BOOLEAN DEFAULT FALSE,
+    requires_approval BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(extension_id, permission_key)
+);
+
+CREATE INDEX idx_ext_perm_def_ext ON extension_permission_definitions(extension_id);
+
+-- Developer Payouts
+CREATE TABLE IF NOT EXISTS developer_payouts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    developer_id UUID NOT NULL REFERENCES developer_accounts(id) ON DELETE CASCADE,
+    amount NUMERIC(12,2) NOT NULL,
+    currency VARCHAR(3) DEFAULT 'USD',
+    period_start DATE NOT NULL,
+    period_end DATE NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+    payout_method VARCHAR(50),
+    transaction_id VARCHAR(255),
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    processed_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX idx_developer_payouts_dev ON developer_payouts(developer_id);
+
+-- Extension Revenue Shares
+CREATE TABLE IF NOT EXISTS extension_revenue (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    extension_id UUID NOT NULL REFERENCES extensions(id) ON DELETE CASCADE,
+    developer_id UUID NOT NULL REFERENCES developer_accounts(id),
+    month DATE NOT NULL,
+    total_sales NUMERIC(12,2) DEFAULT 0,
+    platform_share NUMERIC(12,2) DEFAULT 0,
+    developer_share NUMERIC(12,2) DEFAULT 0,
+    transactions_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(extension_id, developer_id, month)
+);
+
+CREATE INDEX idx_extension_revenue_ext ON extension_revenue(extension_id);
+CREATE INDEX idx_extension_revenue_dev ON extension_revenue(developer_id);
+
+-- ============================================
+-- RLS POLICIES FOR SPRINT 18
+-- ============================================
+
+-- Marketplace Categories (public read)
+CREATE POLICY "Anyone can view marketplace categories"
+    ON marketplace_categories FOR SELECT
+    USING (is_active = TRUE);
+
+-- Extensions (public read for published)
+CREATE POLICY "Anyone can view published extensions"
+    ON extensions FOR SELECT
+    USING (status = 'published');
+
+CREATE POLICY "Developers can manage own extensions"
+    ON extensions FOR ALL
+    USING (developer_id IN (SELECT id FROM developer_accounts WHERE user_id = auth.uid()));
+
+-- Extension Versions
+CREATE POLICY "Anyone can view published extension versions"
+    ON extension_versions FOR SELECT
+    USING (extension_id IN (SELECT id FROM extensions WHERE status = 'published'));
+
+-- Extension Installs
+CREATE POLICY "Users can view own installs"
+    ON extension_installs FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own installs"
+    ON extension_installs FOR ALL
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- Extension Reviews
+CREATE POLICY "Anyone can view reviews"
+    ON extension_reviews FOR SELECT
+    USING (TRUE);
+
+CREATE POLICY "Users can create own reviews"
+    ON extension_reviews FOR INSERT
+    WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can update own reviews"
+    ON extension_reviews FOR UPDATE
+    USING (user_id = auth.uid());
+
+-- Workflows
+CREATE POLICY "Users can view own workflows"
+    ON workflows FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()) OR is_public = TRUE);
+
+CREATE POLICY "Users can manage own workflows"
+    ON workflows FOR ALL
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- Workflow Runs
+CREATE POLICY "Users can view own workflow runs"
+    ON workflow_runs FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- AI Agents (public read for published)
+CREATE POLICY "Anyone can view published agents"
+    ON ai_agents FOR SELECT
+    USING (status = 'published');
+
+CREATE POLICY "Developers can manage own agents"
+    ON ai_agents FOR ALL
+    USING (developer_id IN (SELECT id FROM developer_accounts WHERE user_id = auth.uid()));
+
+-- AI Agent Installs
+CREATE POLICY "Users can view own agent installs"
+    ON ai_agent_installs FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own agent installs"
+    ON ai_agent_installs FOR ALL
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- Templates (public read)
+CREATE POLICY "Anyone can view published templates"
+    ON templates FOR SELECT
+    USING (status = 'published');
+
+-- Prompt Library (public read)
+CREATE POLICY "Anyone can view public prompts"
+    ON prompt_library FOR SELECT
+    USING (is_public = TRUE);
+
+-- Developer Accounts
+CREATE POLICY "Developers can view own account"
+    ON developer_accounts FOR SELECT
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Users can create developer account"
+    ON developer_accounts FOR INSERT
+    WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Developers can update own account"
+    ON developer_accounts FOR UPDATE
+    USING (user_id = auth.uid());
+
+-- Developer Apps
+CREATE POLICY "Developers can manage own apps"
+    ON developer_apps FOR ALL
+    USING (developer_id IN (SELECT id FROM developer_accounts WHERE user_id = auth.uid()));
+
+-- Developer Payouts
+CREATE POLICY "Developers can view own payouts"
+    ON developer_payouts FOR SELECT
+    USING (developer_id IN (SELECT id FROM developer_accounts WHERE user_id = auth.uid()));
+
+-- ============================================
+-- TRIGGERS FOR SPRINT 18
+-- ============================================
+
+CREATE TRIGGER update_extensions_updated_at
+    BEFORE UPDATE ON extensions
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_extension_installs_updated_at
+    BEFORE UPDATE ON extension_installs
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_extension_reviews_updated_at
+    BEFORE UPDATE ON extension_reviews
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_workflows_updated_at
+    BEFORE UPDATE ON workflows
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_ai_agents_updated_at
+    BEFORE UPDATE ON ai_agents
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_templates_updated_at
+    BEFORE UPDATE ON templates
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_prompt_library_updated_at
+    BEFORE UPDATE ON prompt_library
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_developer_accounts_updated_at
+    BEFORE UPDATE ON developer_accounts
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_developer_apps_updated_at
+    BEFORE UPDATE ON developer_apps
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- SPRINT 19: DATA WAREHOUSE, BI & EXECUTIVE ANALYTICS
+-- ============================================
+
+-- Dimension: Dates
+CREATE TABLE IF NOT EXISTS dim_dates (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    date DATE NOT NULL UNIQUE,
+    day INTEGER NOT NULL,
+    day_of_week INTEGER NOT NULL,
+    day_name VARCHAR(10) NOT NULL,
+    month INTEGER NOT NULL,
+    month_name VARCHAR(10) NOT NULL,
+    quarter INTEGER NOT NULL,
+    year INTEGER NOT NULL,
+    week_of_year INTEGER NOT NULL,
+    is_weekend BOOLEAN DEFAULT FALSE,
+    is_holiday BOOLEAN DEFAULT FALSE,
+    fiscal_year INTEGER,
+    fiscal_quarter INTEGER,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_dim_dates_date ON dim_dates(date);
+CREATE INDEX idx_dim_dates_year_month ON dim_dates(year, month);
+
+-- Dimension: Sites
+CREATE TABLE IF NOT EXISTS dim_sites (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    site_id UUID NOT NULL UNIQUE,
+    tenant_id UUID NOT NULL,
+    workspace_id UUID,
+    name VARCHAR(255) NOT NULL,
+    domain VARCHAR(255) NOT NULL,
+    country VARCHAR(10),
+    language VARCHAR(10),
+    category VARCHAR(100),
+    status VARCHAR(20) DEFAULT 'active',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_dim_sites_tenant ON dim_sites(tenant_id);
+CREATE INDEX idx_dim_sites_domain ON dim_sites(domain);
+
+-- Dimension: Tenants
+CREATE TABLE IF NOT EXISTS dim_tenants (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL UNIQUE,
+    name VARCHAR(255) NOT NULL,
+    plan VARCHAR(50),
+    industry VARCHAR(100),
+    country VARCHAR(10),
+    region VARCHAR(100),
+    employee_count INTEGER,
+    status VARCHAR(20) DEFAULT 'active',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_dim_tenants_plan ON dim_tenants(plan);
+
+-- Fact: SEO Metrics (daily)
+CREATE TABLE IF NOT EXISTS fact_seo (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    date_id UUID NOT NULL REFERENCES dim_dates(id),
+    site_id UUID NOT NULL REFERENCES dim_sites(id),
+    tenant_id UUID NOT NULL REFERENCES dim_tenants(id),
+    seo_score NUMERIC(5,2) DEFAULT 0,
+    indexed_urls INTEGER DEFAULT 0,
+    total_urls INTEGER DEFAULT 0,
+    indexation_rate NUMERIC(5,2) DEFAULT 0,
+    crawl_errors INTEGER DEFAULT 0,
+    broken_links INTEGER DEFAULT 0,
+    redirect_chains INTEGER DEFAULT 0,
+    missing_meta INTEGER DEFAULT 0,
+    duplicate_content INTEGER DEFAULT 0,
+    slow_pages INTEGER DEFAULT 0,
+    mobile_issues INTEGER DEFAULT 0,
+    core_web_vitals NUMERIC(5,2) DEFAULT 0,
+    page_speed_score NUMERIC(5,2) DEFAULT 0,
+    authority_score NUMERIC(5,2) DEFAULT 0,
+    backlinks_count INTEGER DEFAULT 0,
+    referring_domains INTEGER DEFAULT 0,
+    organic_traffic NUMERIC(12,2) DEFAULT 0,
+    organic_keywords INTEGER DEFAULT 0,
+    top_10_keywords INTEGER DEFAULT 0,
+    impressions NUMERIC(12,2) DEFAULT 0,
+    clicks NUMERIC(12,2) DEFAULT 0,
+    avg_ctr NUMERIC(5,2) DEFAULT 0,
+    avg_position NUMERIC(5,2) DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(date_id, site_id)
+);
+
+CREATE INDEX idx_fact_seo_site ON fact_seo(site_id);
+CREATE INDEX idx_fact_seo_date ON fact_seo(date_id);
+CREATE INDEX idx_fact_seo_tenant ON fact_seo(tenant_id);
+
+-- Fact: Crawl Metrics (daily)
+CREATE TABLE IF NOT EXISTS fact_crawls (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    date_id UUID NOT NULL REFERENCES dim_dates(id),
+    site_id UUID NOT NULL REFERENCES dim_sites(id),
+    tenant_id UUID NOT NULL REFERENCES dim_tenants(id),
+    pages_crawled INTEGER DEFAULT 0,
+    pages_discovered INTEGER DEFAULT 0,
+    crawl_duration_ms BIGINT DEFAULT 0,
+    avg_page_duration_ms INTEGER DEFAULT 0,
+    max_depth INTEGER DEFAULT 0,
+    avg_depth NUMERIC(5,2) DEFAULT 0,
+    internal_links INTEGER DEFAULT 0,
+    external_links INTEGER DEFAULT 0,
+    orphan_pages INTEGER DEFAULT 0,
+    redirect_pages INTEGER DEFAULT 0,
+    error_pages INTEGER DEFAULT 0,
+    pages_with_canonical INTEGER DEFAULT 0,
+    pages_with_sitemap INTEGER DEFAULT 0,
+    pages_with_schema INTEGER DEFAULT 0,
+    unique_content_ratio NUMERIC(5,2) DEFAULT 0,
+    avg_word_count INTEGER DEFAULT 0,
+    avg_readability_score NUMERIC(5,2) DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(date_id, site_id)
+);
+
+CREATE INDEX idx_fact_crawls_site ON fact_crawls(site_id);
+CREATE INDEX idx_fact_crawls_date ON fact_crawls(date_id);
+
+-- Fact: Content Metrics (daily)
+CREATE TABLE IF NOT EXISTS fact_content (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    date_id UUID NOT NULL REFERENCES dim_dates(id),
+    site_id UUID NOT NULL REFERENCES dim_sites(id),
+    tenant_id UUID NOT NULL REFERENCES dim_tenants(id),
+    total_articles INTEGER DEFAULT 0,
+    new_articles INTEGER DEFAULT 0,
+    updated_articles INTEGER DEFAULT 0,
+    archived_articles INTEGER DEFAULT 0,
+    avg_content_quality NUMERIC(5,2) DEFAULT 0,
+    avg_freshness_score NUMERIC(5,2) DEFAULT 0,
+    semantic_coverage NUMERIC(5,2) DEFAULT 0,
+    topic_clusters INTEGER DEFAULT 0,
+    avg_cluster_size NUMERIC(5,2) DEFAULT 0,
+    entities_detected INTEGER DEFAULT 0,
+    avg_entity_relevance NUMERIC(5,2) DEFAULT 0,
+    internal_links_added INTEGER DEFAULT 0,
+    cannibalization_issues INTEGER DEFAULT 0,
+    content_gaps_found INTEGER DEFAULT 0,
+    editorial_calendar_compliance NUMERIC(5,2) DEFAULT 0,
+    avg_reading_time_min NUMERIC(5,2) DEFAULT 0,
+    readability_score NUMERIC(5,2) DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(date_id, site_id)
+);
+
+CREATE INDEX idx_fact_content_site ON fact_content(site_id);
+CREATE INDEX idx_fact_content_date ON fact_content(date_id);
+
+-- Fact: Competitor Metrics (daily)
+CREATE TABLE IF NOT EXISTS fact_competitors (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    date_id UUID NOT NULL REFERENCES dim_dates(id),
+    site_id UUID NOT NULL REFERENCES dim_sites(id),
+    tenant_id UUID NOT NULL REFERENCES dim_tenants(id),
+    competitor_id UUID NOT NULL,
+    competitor_name VARCHAR(255),
+    competitor_domain VARCHAR(255),
+    competitor_pages INTEGER DEFAULT 0,
+    page_growth_30d INTEGER DEFAULT 0,
+    page_growth_pct NUMERIC(5,2) DEFAULT 0,
+    estimated_traffic NUMERIC(12,2) DEFAULT 0,
+    traffic_growth_pct NUMERIC(5,2) DEFAULT 0,
+    keyword_overlap_pct NUMERIC(5,2) DEFAULT 0,
+    content_gap_count INTEGER DEFAULT 0,
+    backlink_count INTEGER DEFAULT 0,
+    domain_authority NUMERIC(5,2) DEFAULT 0,
+    tech_stack JSONB DEFAULT '[]',
+    new_features_detected TEXT[],
+    market_share_pct NUMERIC(5,2) DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(date_id, site_id, competitor_id)
+);
+
+CREATE INDEX idx_fact_competitors_site ON fact_competitors(site_id);
+CREATE INDEX idx_fact_competitors_date ON fact_competitors(date_id);
+
+-- Fact: AI Usage Metrics (daily)
+CREATE TABLE IF NOT EXISTS fact_ai_usage (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    date_id UUID NOT NULL REFERENCES dim_dates(id),
+    tenant_id UUID NOT NULL REFERENCES dim_tenants(id),
+    queries_total INTEGER DEFAULT 0,
+    queries_by_type JSONB DEFAULT '{}',
+    recommendations_made INTEGER DEFAULT 0,
+    recommendations_accepted INTEGER DEFAULT 0,
+    acceptance_rate NUMERIC(5,2) DEFAULT 0,
+    automations_executed INTEGER DEFAULT 0,
+    automations_successful INTEGER DEFAULT 0,
+    time_saved_minutes NUMERIC(10,2) DEFAULT 0,
+    tokens_consumed INTEGER DEFAULT 0,
+    cost_usd NUMERIC(10,4) DEFAULT 0,
+    avg_response_time_ms INTEGER DEFAULT 0,
+    most_used_features JSONB DEFAULT '[]',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(date_id, tenant_id)
+);
+
+CREATE INDEX idx_fact_ai_tenant ON fact_ai_usage(tenant_id);
+CREATE INDEX idx_fact_ai_date ON fact_ai_usage(date_id);
+
+-- Fact: Billing Metrics (daily)
+CREATE TABLE IF NOT EXISTS fact_billing (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    date_id UUID NOT NULL REFERENCES dim_dates(id),
+    tenant_id UUID NOT NULL REFERENCES dim_tenants(id),
+    mrr NUMERIC(12,2) DEFAULT 0,
+    arr NUMERIC(12,2) DEFAULT 0,
+    revenue NUMERIC(12,2) DEFAULT 0,
+    new_revenue NUMERIC(12,2) DEFAULT 0,
+    expansion_revenue NUMERIC(12,2) DEFAULT 0,
+    churned_revenue NUMERIC(12,2) DEFAULT 0,
+    net_revenue NUMERIC(12,2) DEFAULT 0,
+    active_subscriptions INTEGER DEFAULT 0,
+    new_subscriptions INTEGER DEFAULT 0,
+    cancelled_subscriptions INTEGER DEFAULT 0,
+    trial_starts INTEGER DEFAULT 0,
+    trial_conversions INTEGER DEFAULT 0,
+    churn_rate NUMERIC(5,2) DEFAULT 0,
+    ltv NUMERIC(12,2) DEFAULT 0,
+    arpu NUMERIC(10,2) DEFAULT 0,
+    invoices_pending INTEGER DEFAULT 0,
+    invoices_overdue INTEGER DEFAULT 0,
+    payments_failed INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(date_id, tenant_id)
+);
+
+CREATE INDEX idx_fact_billing_tenant ON fact_billing(tenant_id);
+CREATE INDEX idx_fact_billing_date ON fact_billing(date_id);
+
+-- Fact: Monitoring Metrics (daily)
+CREATE TABLE IF NOT EXISTS fact_monitoring (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    date_id UUID NOT NULL REFERENCES dim_dates(id),
+    site_id UUID NOT NULL REFERENCES dim_sites(id),
+    tenant_id UUID NOT NULL REFERENCES dim_tenants(id),
+    uptime_pct NUMERIC(5,2) DEFAULT 100,
+    downtime_minutes NUMERIC(10,2) DEFAULT 0,
+    avg_response_time_ms INTEGER DEFAULT 0,
+    p95_response_time_ms INTEGER DEFAULT 0,
+    p99_response_time_ms INTEGER DEFAULT 0,
+    ssl_expiry_days INTEGER,
+    certificate_valid BOOLEAN DEFAULT TRUE,
+    dns_resolution_ms INTEGER DEFAULT 0,
+    incidents_count INTEGER DEFAULT 0,
+    incidents_resolved INTEGER DEFAULT 0,
+    avg_resolution_time_min NUMERIC(10,2) DEFAULT 0,
+    alerts_fired INTEGER DEFAULT 0,
+    alerts_acknowledged INTEGER DEFAULT 0,
+    status_checks_passed INTEGER DEFAULT 0,
+    status_checks_failed INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(date_id, site_id)
+);
+
+CREATE INDEX idx_fact_monitoring_site ON fact_monitoring(site_id);
+CREATE INDEX idx_fact_monitoring_date ON fact_monitoring(date_id);
+
+-- Fact: Automation Metrics (daily)
+CREATE TABLE IF NOT EXISTS fact_automations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    date_id UUID NOT NULL REFERENCES dim_dates(id),
+    tenant_id UUID NOT NULL REFERENCES dim_tenants(id),
+    workflows_total INTEGER DEFAULT 0,
+    workflows_active INTEGER DEFAULT 0,
+    workflows_executed INTEGER DEFAULT 0,
+    workflows_successful INTEGER DEFAULT 0,
+    workflows_failed INTEGER DEFAULT 0,
+    avg_execution_time_ms INTEGER DEFAULT 0,
+    connectors_active INTEGER DEFAULT 0,
+    api_calls_made INTEGER DEFAULT 0,
+    webhooks_triggered INTEGER DEFAULT 0,
+    tasks_automated INTEGER DEFAULT 0,
+    time_saved_hours NUMERIC(10,2) DEFAULT 0,
+    error_rate NUMERIC(5,2) DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(date_id, tenant_id)
+);
+
+CREATE INDEX idx_fact_automations_tenant ON fact_automations(tenant_id);
+CREATE INDEX idx_fact_automations_date ON fact_automations(date_id);
+
+-- Executive Metrics (real-time aggregated)
+CREATE TABLE IF NOT EXISTS executive_metrics (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL,
+    metric_key VARCHAR(100) NOT NULL,
+    metric_value NUMERIC(15,2) NOT NULL,
+    metric_unit VARCHAR(20),
+    trend VARCHAR(20) CHECK (trend IN ('up', 'down', 'stable', 'new')),
+    trend_pct NUMERIC(5,2) DEFAULT 0,
+    period VARCHAR(20) NOT NULL,
+    comparison_period VARCHAR(20),
+    previous_value NUMERIC(15,2),
+    target_value NUMERIC(15,2),
+    metadata JSONB DEFAULT '{}',
+    computed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    expires_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(tenant_id, metric_key, period)
+);
+
+CREATE INDEX idx_executive_metrics_tenant ON executive_metrics(tenant_id);
+CREATE INDEX idx_executive_metrics_key ON executive_metrics(metric_key);
+CREATE INDEX idx_executive_metrics_period ON executive_metrics(period);
+
+-- KPI Definitions
+CREATE TABLE IF NOT EXISTS kpi_definitions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
+    category VARCHAR(100) NOT NULL,
+    formula TEXT,
+    unit VARCHAR(20),
+    target_value NUMERIC(15,2),
+    warning_threshold NUMERIC(15,2),
+    critical_threshold NUMERIC(15,2),
+    direction VARCHAR(10) CHECK (direction IN ('higher_is_better', 'lower_is_better', 'target')),
+    data_sources TEXT[],
+    update_frequency VARCHAR(20) DEFAULT 'daily',
+    is_active BOOLEAN DEFAULT TRUE,
+    is_custom BOOLEAN DEFAULT FALSE,
+    tenant_id UUID,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_kpi_definitions_category ON kpi_definitions(category);
+CREATE INDEX idx_kpi_definitions_tenant ON kpi_definitions(tenant_id);
+
+-- KPI Values (historical)
+CREATE TABLE IF NOT EXISTS kpi_values (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    kpi_id UUID NOT NULL REFERENCES kpi_definitions(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL,
+    date_id UUID NOT NULL REFERENCES dim_dates(id),
+    value NUMERIC(15,2) NOT NULL,
+    target_met BOOLEAN,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(kpi_id, tenant_id, date_id)
+);
+
+CREATE INDEX idx_kpi_values_kpi ON kpi_values(kpi_id);
+CREATE INDEX idx_kpi_values_tenant ON kpi_values(tenant_id);
+CREATE INDEX idx_kpi_values_date ON kpi_values(date_id);
+
+-- Predictive Forecasts
+CREATE TABLE IF NOT EXISTS predictive_forecasts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL,
+    metric_key VARCHAR(100) NOT NULL,
+    forecast_type VARCHAR(50) NOT NULL,
+    target_date DATE NOT NULL,
+    predicted_value NUMERIC(15,2) NOT NULL,
+    confidence_lower NUMERIC(15,2),
+    confidence_upper NUMERIC(15,2),
+    confidence_level NUMERIC(5,2) DEFAULT 95,
+    model_version VARCHAR(50),
+    actual_value NUMERIC(15,2),
+    accuracy_pct NUMERIC(5,2),
+    data_points_used INTEGER,
+    factors JSONB DEFAULT '[]',
+    generated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_forecasts_tenant ON predictive_forecasts(tenant_id);
+CREATE INDEX idx_forecasts_metric ON predictive_forecasts(metric_key);
+CREATE INDEX idx_forecasts_date ON predictive_forecasts(target_date);
+
+-- Executive Alerts (intelligent)
+CREATE TABLE IF NOT EXISTS executive_alerts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL,
+    alert_type VARCHAR(50) NOT NULL,
+    severity VARCHAR(20) DEFAULT 'info' CHECK (severity IN ('info', 'warning', 'critical')),
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    metric_key VARCHAR(100),
+    current_value NUMERIC(15,2),
+    previous_value NUMERIC(15,2),
+    change_pct NUMERIC(5,2),
+    anomaly_score NUMERIC(5,2) DEFAULT 0,
+    root_cause TEXT,
+    recommended_actions TEXT[],
+    affected_sites UUID[],
+    is_read BOOLEAN DEFAULT FALSE,
+    is_resolved BOOLEAN DEFAULT FALSE,
+    resolved_at TIMESTAMP WITH TIME ZONE,
+    resolved_by UUID,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_executive_alerts_tenant ON executive_alerts(tenant_id);
+CREATE INDEX idx_executive_alerts_severity ON executive_alerts(severity);
+CREATE INDEX idx_executive_alerts_unread ON executive_alerts(tenant_id, is_read) WHERE is_read = FALSE;
+
+-- Report Definitions
+CREATE TABLE IF NOT EXISTS report_definitions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    report_type VARCHAR(50) NOT NULL,
+    config JSONB DEFAULT '{}',
+    widgets JSONB DEFAULT '[]',
+    filters JSONB DEFAULT '{}',
+    schedule_cron VARCHAR(100),
+    schedule_timezone VARCHAR(50) DEFAULT 'UTC',
+    recipients JSONB DEFAULT '[]',
+    export_format VARCHAR(20) DEFAULT 'pdf' CHECK (export_format IN ('pdf', 'excel', 'csv', 'html')),
+    last_generated_at TIMESTAMP WITH TIME ZONE,
+    next_generation_at TIMESTAMP WITH TIME ZONE,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_report_definitions_tenant ON report_definitions(tenant_id);
+
+-- Report Runs (history)
+CREATE TABLE IF NOT EXISTS report_runs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    report_id UUID NOT NULL REFERENCES report_definitions(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL,
+    status VARCHAR(20) DEFAULT 'running' CHECK (status IN ('running', 'completed', 'failed')),
+    file_url TEXT,
+    file_size_bytes BIGINT,
+    file_format VARCHAR(20),
+    execution_time_ms INTEGER,
+    error_message TEXT,
+    requested_by UUID,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    completed_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX idx_report_runs_report ON report_runs(report_id);
+CREATE INDEX idx_report_runs_tenant ON report_runs(tenant_id);
+
+-- Data Explorer Saved Queries
+CREATE TABLE IF NOT EXISTS data_explorer_queries (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL,
+    user_id UUID NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    query_config JSONB DEFAULT '{}',
+    columns JSONB DEFAULT '[]',
+    filters JSONB DEFAULT '{}',
+    sort_config JSONB DEFAULT '{}',
+    visualization_type VARCHAR(50) DEFAULT 'table',
+    is_starred BOOLEAN DEFAULT FALSE,
+    run_count INTEGER DEFAULT 0,
+    last_run_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_data_explorer_tenant ON data_explorer_queries(tenant_id);
+CREATE INDEX idx_data_explorer_user ON data_explorer_queries(user_id);
+
+-- ETL Pipeline Runs
+CREATE TABLE IF NOT EXISTS etl_pipeline_runs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pipeline_name VARCHAR(100) NOT NULL,
+    source_module VARCHAR(100) NOT NULL,
+    status VARCHAR(20) DEFAULT 'running' CHECK (status IN ('running', 'completed', 'failed', 'partial')),
+    records_extracted INTEGER DEFAULT 0,
+    records_transformed INTEGER DEFAULT 0,
+    records_loaded INTEGER DEFAULT 0,
+    records_failed INTEGER DEFAULT 0,
+    errors JSONB DEFAULT '[]',
+    started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    completed_at TIMESTAMP WITH TIME ZONE,
+    duration_ms INTEGER
+);
+
+CREATE INDEX idx_etl_runs_pipeline ON etl_pipeline_runs(pipeline_name);
+CREATE INDEX idx_etl_runs_status ON etl_pipeline_runs(status);
+
+-- ============================================
+-- RLS POLICIES FOR SPRINT 19
+-- ============================================
+
+-- Executive Metrics
+CREATE POLICY "Users can view own executive metrics"
+    ON executive_metrics FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own executive metrics"
+    ON executive_metrics FOR ALL
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- KPI Definitions
+CREATE POLICY "Users can view KPI definitions"
+    ON kpi_definitions FOR SELECT
+    USING (is_active = TRUE AND (tenant_id IS NULL OR tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid())));
+
+CREATE POLICY "Users can manage own KPI definitions"
+    ON kpi_definitions FOR ALL
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- KPI Values
+CREATE POLICY "Users can view own KPI values"
+    ON kpi_values FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own KPI values"
+    ON kpi_values FOR ALL
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- Predictive Forecasts
+CREATE POLICY "Users can view own forecasts"
+    ON predictive_forecasts FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own forecasts"
+    ON predictive_forecasts FOR ALL
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- Executive Alerts
+CREATE POLICY "Users can view own alerts"
+    ON executive_alerts FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own alerts"
+    ON executive_alerts FOR ALL
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- Report Definitions
+CREATE POLICY "Users can view own reports"
+    ON report_definitions FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own reports"
+    ON report_definitions FOR ALL
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- Report Runs
+CREATE POLICY "Users can view own report runs"
+    ON report_runs FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- Data Explorer Queries
+CREATE POLICY "Users can view own queries"
+    ON data_explorer_queries FOR SELECT
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Users can manage own queries"
+    ON data_explorer_queries FOR ALL
+    USING (user_id = auth.uid());
+
+-- ============================================
+-- TRIGGERS FOR SPRINT 19
+-- ============================================
+
+CREATE TRIGGER update_kpi_definitions_updated_at
+    BEFORE UPDATE ON kpi_definitions
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_report_definitions_updated_at
+    BEFORE UPDATE ON report_definitions
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_data_explorer_queries_updated_at
+    BEFORE UPDATE ON data_explorer_queries
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();

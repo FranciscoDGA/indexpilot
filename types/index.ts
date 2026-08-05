@@ -138,3 +138,9 @@ export * from './content-intelligence';
 
 // Re-export Sprint 16 Enterprise Types
 export * from './enterprise';
+
+// Re-export Sprint 17 Billing Types
+export * from './billing';
+
+// Re-export Sprint 19 Analytics Types
+export * from './analytics';
