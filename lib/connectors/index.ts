@@ -5,6 +5,9 @@ export { IndexNowConnector, indexNowConnector } from './indexNowConnector';
 // Sprint 11 - CMS Connectors & Auto Sync Platform
 export { BaseCMSConnector } from './sdk/connectorInterface';
 export { ConnectorManager } from './connectorManager';
+export { WebhookEngine } from './webhookEngine';
+export { PollingEngine } from './pollingEngine';
+export { DiffEngine } from './diffEngine';
 export {
   PROVIDER_REGISTRY,
   getProviderInfo,
