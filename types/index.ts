@@ -126,3 +126,9 @@ export * from './connectors';
 
 // Re-export Sprint 12 Platform Types
 export * from './platform';
+
+// Re-export Sprint 13 Monitoring Types
+export * from './monitoring';
+
+// Re-export Sprint 14 Competitor Intelligence Types
+export * from './competitors';

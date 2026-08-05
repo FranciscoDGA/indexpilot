@@ -1496,3 +1496,280 @@ CREATE TRIGGER update_monitoring_rules_updated_at
     BEFORE UPDATE ON monitoring_rules
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- SPRINT 14: COMPETITOR INTELLIGENCE & SEO OBSERVATORY
+-- ============================================
+
+-- ============================================
+-- COMPETITORS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS competitors (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workspace_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    domain VARCHAR(255) NOT NULL,
+    category VARCHAR(50) DEFAULT 'direct' CHECK (category IN ('direct', 'indirect', 'reference')),
+    country VARCHAR(10),
+    language VARCHAR(10),
+    priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('high', 'medium', 'low')),
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'paused', 'archived')),
+    notes TEXT,
+    last_crawled_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- COMPETITOR CRAWLS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS competitor_crawls (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    competitor_id UUID NOT NULL REFERENCES competitors(id) ON DELETE CASCADE,
+    started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    finished_at TIMESTAMP WITH TIME ZONE,
+    pages_found INTEGER DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'running', 'completed', 'failed')),
+    error_message TEXT,
+    metadata JSONB DEFAULT '{}'
+);
+
+-- ============================================
+-- COMPETITOR PAGES
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS competitor_pages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    competitor_id UUID NOT NULL REFERENCES competitors(id) ON DELETE CASCADE,
+    crawl_id UUID REFERENCES competitor_crawls(id) ON DELETE SET NULL,
+    url TEXT NOT NULL,
+    type VARCHAR(50) DEFAULT 'page' CHECK (type IN ('page', 'article', 'category', 'product', 'landing', 'tool', 'other')),
+    depth INTEGER DEFAULT 0,
+    title TEXT,
+    meta_description TEXT,
+    canonical TEXT,
+    schema_type TEXT,
+    internal_links_count INTEGER DEFAULT 0,
+    external_links_count INTEGER DEFAULT 0,
+    images_count INTEGER DEFAULT 0,
+    word_count INTEGER DEFAULT 0,
+    has_faq BOOLEAN DEFAULT FALSE,
+    has_howto BOOLEAN DEFAULT FALSE,
+    has_breadcrumb BOOLEAN DEFAULT FALSE,
+    status_code INTEGER,
+    response_time_ms INTEGER,
+    content_hash VARCHAR(64),
+    first_seen_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- COMPETITOR CATEGORIES (site structure)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS competitor_categories (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    competitor_id UUID NOT NULL REFERENCES competitors(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) NOT NULL,
+    url TEXT,
+    parent_id UUID REFERENCES competitor_categories(id) ON DELETE SET NULL,
+    pages_count INTEGER DEFAULT 0,
+    depth INTEGER DEFAULT 0,
+    discovered_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- BENCHMARKS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS benchmarks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workspace_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    competitor_id UUID NOT NULL REFERENCES competitors(id) ON DELETE CASCADE,
+    metric VARCHAR(100) NOT NULL,
+    my_value JSONB,
+    competitor_value JSONB,
+    category VARCHAR(50) DEFAULT 'technical' CHECK (category IN ('technical', 'content', 'authority', 'structure')),
+    calculated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- CONTENT GAPS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS content_gaps (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workspace_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    topic VARCHAR(255) NOT NULL,
+    description TEXT,
+    competitor_id UUID REFERENCES competitors(id) ON DELETE SET NULL,
+    competitor_urls TEXT[],
+    priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('high', 'medium', 'low')),
+    status VARCHAR(20) DEFAULT 'identified' CHECK (status IN ('identified', 'in_progress', 'completed', 'ignored')),
+    estimated_potential TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- COMPETITOR CHANGES (change history)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS competitor_changes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    competitor_id UUID NOT NULL REFERENCES competitors(id) ON DELETE CASCADE,
+    change_type VARCHAR(50) NOT NULL CHECK (change_type IN ('new_page', 'removed_page', 'updated_page', 'new_category', 'removed_category', 'structure_change', 'sitemap_change', 'robots_change', 'schema_change')),
+    url TEXT,
+    old_value TEXT,
+    new_value TEXT,
+    detected_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- COMPETITIVE OPPORTUNITIES
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS competitive_opportunities (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workspace_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    type VARCHAR(50) NOT NULL CHECK (type IN ('content_gap', 'technical_improvement', 'structure_change', 'new_topic', 'schema_adoption')),
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    competitor_id UUID REFERENCES competitors(id) ON DELETE SET NULL,
+    priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('high', 'medium', 'low')),
+    impact VARCHAR(20) DEFAULT 'medium' CHECK (impact IN ('high', 'medium', 'low')),
+    effort VARCHAR(20) DEFAULT 'medium' CHECK (effort IN ('high', 'medium', 'low')),
+    status VARCHAR(20) DEFAULT 'identified' CHECK (status IN ('identified', 'in_progress', 'completed', 'dismissed')),
+    supporting_data JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- MARKET TIMELINE
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS market_timeline (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workspace_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    competitor_id UUID NOT NULL REFERENCES competitors(id) ON DELETE CASCADE,
+    event_type VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    metadata JSONB DEFAULT '{}',
+    occurred_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- INDEXES FOR SPRINT 14
+-- ============================================
+
+CREATE INDEX IF NOT EXISTS idx_competitors_workspace ON competitors(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_competitors_domain ON competitors(domain);
+CREATE INDEX IF NOT EXISTS idx_competitor_crawls_competitor ON competitor_crawls(competitor_id);
+CREATE INDEX IF NOT EXISTS idx_competitor_crawls_status ON competitor_crawls(status);
+CREATE INDEX IF NOT EXISTS idx_competitor_pages_competitor ON competitor_pages(competitor_id);
+CREATE INDEX IF NOT EXISTS idx_competitor_pages_url ON competitor_pages(url);
+CREATE INDEX IF NOT EXISTS idx_competitor_pages_type ON competitor_pages(type);
+CREATE INDEX IF NOT EXISTS idx_competitor_categories_competitor ON competitor_categories(competitor_id);
+CREATE INDEX IF NOT EXISTS idx_benchmarks_workspace ON benchmarks(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_benchmarks_competitor ON benchmarks(competitor_id);
+CREATE INDEX IF NOT EXISTS idx_benchmarks_metric ON benchmarks(metric);
+CREATE INDEX IF NOT EXISTS idx_content_gaps_workspace ON content_gaps(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_content_gaps_priority ON content_gaps(priority);
+CREATE INDEX IF NOT EXISTS idx_competitor_changes_competitor ON competitor_changes(competitor_id);
+CREATE INDEX IF NOT EXISTS idx_competitor_changes_type ON competitor_changes(change_type);
+CREATE INDEX IF NOT EXISTS idx_competitor_changes_detected ON competitor_changes(detected_at);
+CREATE INDEX IF NOT EXISTS idx_competitive_opportunities_workspace ON competitive_opportunities(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_competitive_opportunities_type ON competitive_opportunities(type);
+CREATE INDEX IF NOT EXISTS idx_competitive_opportunities_priority ON competitive_opportunities(priority);
+CREATE INDEX IF NOT EXISTS idx_market_timeline_workspace ON market_timeline(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_market_timeline_competitor ON market_timeline(competitor_id);
+
+-- ============================================
+-- RLS POLICIES FOR SPRINT 14
+-- ============================================
+
+-- Competitors
+CREATE POLICY "Users can view own competitors"
+    ON competitors FOR SELECT
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own competitors"
+    ON competitors FOR ALL
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+-- Competitor Crawls
+CREATE POLICY "Users can view own competitor crawls"
+    ON competitor_crawls FOR SELECT
+    USING (competitor_id IN (SELECT id FROM competitors WHERE workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid())));
+
+-- Competitor Pages
+CREATE POLICY "Users can view own competitor pages"
+    ON competitor_pages FOR SELECT
+    USING (competitor_id IN (SELECT id FROM competitors WHERE workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid())));
+
+-- Competitor Categories
+CREATE POLICY "Users can view own competitor categories"
+    ON competitor_categories FOR SELECT
+    USING (competitor_id IN (SELECT id FROM competitors WHERE workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid())));
+
+-- Benchmarks
+CREATE POLICY "Users can view own benchmarks"
+    ON benchmarks FOR SELECT
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own benchmarks"
+    ON benchmarks FOR ALL
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+-- Content Gaps
+CREATE POLICY "Users can view own content gaps"
+    ON content_gaps FOR SELECT
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own content gaps"
+    ON content_gaps FOR ALL
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+-- Competitor Changes
+CREATE POLICY "Users can view own competitor changes"
+    ON competitor_changes FOR SELECT
+    USING (competitor_id IN (SELECT id FROM competitors WHERE workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid())));
+
+-- Competitive Opportunities
+CREATE POLICY "Users can view own competitive opportunities"
+    ON competitive_opportunities FOR SELECT
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own competitive opportunities"
+    ON competitive_opportunities FOR ALL
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+-- Market Timeline
+CREATE POLICY "Users can view own market timeline"
+    ON market_timeline FOR SELECT
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+-- ============================================
+-- TRIGGERS FOR SPRINT 14
+-- ============================================
+
+CREATE TRIGGER update_competitors_updated_at
+    BEFORE UPDATE ON competitors
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_content_gaps_updated_at
+    BEFORE UPDATE ON content_gaps
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_competitive_opportunities_updated_at
+    BEFORE UPDATE ON competitive_opportunities
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
