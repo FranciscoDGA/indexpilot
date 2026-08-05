@@ -3941,3 +3941,396 @@ CREATE TRIGGER update_data_explorer_queries_updated_at
     BEFORE UPDATE ON data_explorer_queries
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- SPRINT 20: AI OPERATIONS CENTER & INDEXPILOT OS 1.0
+-- ============================================
+
+-- AI Goals
+CREATE TABLE IF NOT EXISTS ai_goals (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    category VARCHAR(50) NOT NULL CHECK (category IN ('seo', 'indexation', 'content', 'performance', 'growth', 'revenue', 'custom')),
+    metric_key VARCHAR(100) NOT NULL,
+    target_value NUMERIC(15,2) NOT NULL,
+    current_value NUMERIC(15,2) DEFAULT 0,
+    deadline DATE,
+    priority INTEGER DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'paused', 'completed', 'abandoned')),
+    progress_pct NUMERIC(5,2) DEFAULT 0,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_ai_goals_tenant ON ai_goals(tenant_id);
+CREATE INDEX idx_ai_goals_status ON ai_goals(status);
+CREATE INDEX idx_ai_goals_category ON ai_goals(category);
+
+-- AI Strategies (action plans)
+CREATE TABLE IF NOT EXISTS ai_strategies (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL,
+    goal_id UUID REFERENCES ai_goals(id) ON DELETE SET NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    steps JSONB DEFAULT '[]',
+    status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'pending_approval', 'approved', 'executing', 'completed', 'failed', 'cancelled')),
+    confidence NUMERIC(5,2) DEFAULT 0,
+    estimated_impact NUMERIC(5,2) DEFAULT 0,
+    estimated_duration_days INTEGER,
+    approved_by UUID,
+    approved_at TIMESTAMP WITH TIME ZONE,
+    execution_log JSONB DEFAULT '[]',
+    result_summary TEXT,
+    started_at TIMESTAMP WITH TIME ZONE,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_ai_strategies_tenant ON ai_strategies(tenant_id);
+CREATE INDEX idx_ai_strategies_goal ON ai_strategies(goal_id);
+CREATE INDEX idx_ai_strategies_status ON ai_strategies(status);
+
+-- AI Decisions
+CREATE TABLE IF NOT EXISTS ai_decisions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL,
+    strategy_id UUID REFERENCES ai_strategies(id) ON DELETE SET NULL,
+    decision_type VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    context JSONB DEFAULT '{}',
+    reasoning TEXT,
+    confidence NUMERIC(5,2) NOT NULL,
+    impact_score NUMERIC(5,2) DEFAULT 0,
+    urgency VARCHAR(20) DEFAULT 'medium' CHECK (urgency IN ('low', 'medium', 'high', 'critical')),
+    dependencies UUID[],
+    auto_executable BOOLEAN DEFAULT FALSE,
+    requires_approval BOOLEAN DEFAULT TRUE,
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'executing', 'completed', 'failed')),
+    approved_by UUID,
+    approved_at TIMESTAMP WITH TIME ZONE,
+    rejected_reason TEXT,
+    executed_at TIMESTAMP WITH TIME ZONE,
+    result JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_ai_decisions_tenant ON ai_decisions(tenant_id);
+CREATE INDEX idx_ai_decisions_status ON ai_decisions(status);
+CREATE INDEX idx_ai_decisions_type ON ai_decisions(decision_type);
+CREATE INDEX idx_ai_decisions_pending ON ai_decisions(requires_approval, status) WHERE status = 'pending';
+
+-- AI Recommendations
+CREATE TABLE IF NOT EXISTS ai_recommendations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    impact_score NUMERIC(5,2) DEFAULT 0,
+    confidence NUMERIC(5,2) DEFAULT 0,
+    effort_level VARCHAR(20) DEFAULT 'medium' CHECK (effort_level IN ('low', 'medium', 'high')),
+    affected_module VARCHAR(50),
+    affected_resource_id UUID,
+    data_evidence JSONB DEFAULT '{}',
+    suggested_actions TEXT[],
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'accepted', 'dismissed', 'executing', 'completed')),
+    accepted_by UUID,
+    accepted_at TIMESTAMP WITH TIME ZONE,
+    dismissed_reason TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_ai_recommendations_tenant ON ai_recommendations(tenant_id);
+CREATE INDEX idx_ai_recommendations_status ON ai_recommendations(status);
+CREATE INDEX idx_ai_recommendations_impact ON ai_recommendations(impact_score DESC);
+
+-- AI Memory (learning history)
+CREATE TABLE IF NOT EXISTS ai_memory (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL,
+    context_type VARCHAR(50) NOT NULL,
+    context_key VARCHAR(255),
+    action_taken TEXT NOT NULL,
+    action_result TEXT,
+    outcome VARCHAR(20) CHECK (outcome IN ('positive', 'negative', 'neutral', 'mixed')),
+    confidence_before NUMERIC(5,2),
+    confidence_after NUMERIC(5,2),
+    lessons_learned TEXT[],
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_ai_memory_tenant ON ai_memory(tenant_id);
+CREATE INDEX idx_ai_memory_context ON ai_memory(context_type);
+CREATE INDEX idx_ai_memory_outcome ON ai_memory(outcome);
+
+-- AI Learning (pattern recognition)
+CREATE TABLE IF NOT EXISTS ai_learning (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL,
+    pattern_type VARCHAR(50) NOT NULL,
+    pattern_key VARCHAR(255) NOT NULL,
+    pattern_description TEXT,
+    occurrences INTEGER DEFAULT 1,
+    success_rate NUMERIC(5,2) DEFAULT 0,
+    avg_impact NUMERIC(5,2) DEFAULT 0,
+    confidence NUMERIC(5,2) DEFAULT 0,
+    last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_ai_learning_tenant ON ai_learning(tenant_id);
+CREATE INDEX idx_ai_learning_type ON ai_learning(pattern_type);
+CREATE INDEX idx_ai_learning_confidence ON ai_learning(confidence DESC);
+
+-- AI Briefings (daily summaries)
+CREATE TABLE IF NOT EXISTS ai_briefings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    summary TEXT NOT NULL,
+    highlights JSONB DEFAULT '[]',
+    alerts JSONB DEFAULT '[]',
+    recommendations JSONB DEFAULT '[]',
+    metrics_summary JSONB DEFAULT '{}',
+    goals_progress JSONB DEFAULT '[]',
+    period VARCHAR(20) DEFAULT 'daily',
+    date DATE NOT NULL,
+    sent_via VARCHAR(20) CHECK (sent_via IN ('email', 'dashboard', 'both')),
+    sent_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_ai_briefings_tenant ON ai_briefings(tenant_id);
+CREATE INDEX idx_ai_briefings_date ON ai_briefings(date);
+CREATE INDEX idx_ai_briefings_unique ON ai_briefings(tenant_id, date, period);
+
+-- AI Workflows (composed by AI)
+CREATE TABLE IF NOT EXISTS ai_workflows (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    trigger_event VARCHAR(100) NOT NULL,
+    steps JSONB DEFAULT '[]',
+    conditions JSONB DEFAULT '{}',
+    status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'paused', 'archived')),
+    auto_execute BOOLEAN DEFAULT FALSE,
+    requires_approval BOOLEAN DEFAULT TRUE,
+    execution_count INTEGER DEFAULT 0,
+    success_rate NUMERIC(5,2) DEFAULT 100,
+    avg_duration_ms INTEGER DEFAULT 0,
+    created_by VARCHAR(20) DEFAULT 'ai' CHECK (created_by IN ('ai', 'user', 'imported')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_ai_workflows_tenant ON ai_workflows(tenant_id);
+CREATE INDEX idx_ai_workflows_status ON ai_workflows(status);
+
+-- AI Simulations
+CREATE TABLE IF NOT EXISTS ai_simulations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    scenario_type VARCHAR(50) NOT NULL,
+    input_params JSONB DEFAULT '{}',
+    assumptions JSONB DEFAULT '[]',
+    predicted_outcomes JSONB DEFAULT '{}',
+    confidence_level NUMERIC(5,2) DEFAULT 95,
+    time_horizon_days INTEGER DEFAULT 90,
+    status VARCHAR(20) DEFAULT 'completed' CHECK (status IN ('running', 'completed', 'failed')),
+    execution_time_ms INTEGER,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_ai_simulations_tenant ON ai_simulations(tenant_id);
+
+-- AI Governance Policies
+CREATE TABLE IF NOT EXISTS ai_governance (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL,
+    policy_type VARCHAR(50) NOT NULL CHECK (policy_type IN ('auto_approve', 'require_approval', 'forbidden', 'rate_limit', 'scope_limit')),
+    module VARCHAR(50),
+    action VARCHAR(100),
+    max_confidence NUMERIC(5,2),
+    max_impact NUMERIC(5,2),
+    rate_limit_per_hour INTEGER,
+    rate_limit_per_day INTEGER,
+    scope_restrictions JSONB DEFAULT '{}',
+    is_active BOOLEAN DEFAULT TRUE,
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_ai_governance_tenant ON ai_governance(tenant_id);
+CREATE INDEX idx_ai_governance_type ON ai_governance(policy_type);
+
+-- AI Audit Log
+CREATE TABLE IF NOT EXISTS ai_audit_log (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL,
+    event_type VARCHAR(50) NOT NULL,
+    entity_type VARCHAR(50) NOT NULL,
+    entity_id UUID,
+    action VARCHAR(100) NOT NULL,
+    actor VARCHAR(50) DEFAULT 'ai',
+    details JSONB DEFAULT '{}',
+    ip_address VARCHAR(45),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_ai_audit_tenant ON ai_audit_log(tenant_id);
+CREATE INDEX idx_ai_audit_type ON ai_audit_log(event_type);
+CREATE INDEX idx_ai_audit_entity ON ai_audit_log(entity_type, entity_id);
+CREATE INDEX idx_ai_audit_created ON ai_audit_log(created_at DESC);
+
+-- ============================================
+-- RLS POLICIES FOR SPRINT 20
+-- ============================================
+
+-- AI Goals
+CREATE POLICY "Users can view own goals"
+    ON ai_goals FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own goals"
+    ON ai_goals FOR ALL
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- AI Strategies
+CREATE POLICY "Users can view own strategies"
+    ON ai_strategies FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own strategies"
+    ON ai_strategies FOR ALL
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- AI Decisions
+CREATE POLICY "Users can view own decisions"
+    ON ai_decisions FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own decisions"
+    ON ai_decisions FOR ALL
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- AI Recommendations
+CREATE POLICY "Users can view own recommendations"
+    ON ai_recommendations FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own recommendations"
+    ON ai_recommendations FOR ALL
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- AI Memory
+CREATE POLICY "Users can view own memory"
+    ON ai_memory FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own memory"
+    ON ai_memory FOR ALL
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- AI Learning
+CREATE POLICY "Users can view own learning"
+    ON ai_learning FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own learning"
+    ON ai_learning FOR ALL
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- AI Briefings
+CREATE POLICY "Users can view own briefings"
+    ON ai_briefings FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own briefings"
+    ON ai_briefings FOR ALL
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- AI Workflows
+CREATE POLICY "Users can view own workflows"
+    ON ai_workflows FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own workflows"
+    ON ai_workflows FOR ALL
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- AI Simulations
+CREATE POLICY "Users can view own simulations"
+    ON ai_simulations FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own simulations"
+    ON ai_simulations FOR ALL
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- AI Governance
+CREATE POLICY "Users can view own governance"
+    ON ai_governance FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own governance"
+    ON ai_governance FOR ALL
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- AI Audit Log (read-only for users, system writes)
+CREATE POLICY "Users can view own audit log"
+    ON ai_audit_log FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- ============================================
+-- TRIGGERS FOR SPRINT 20
+-- ============================================
+
+CREATE TRIGGER update_ai_goals_updated_at
+    BEFORE UPDATE ON ai_goals
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_ai_strategies_updated_at
+    BEFORE UPDATE ON ai_strategies
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_ai_decisions_updated_at
+    BEFORE UPDATE ON ai_decisions
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_ai_recommendations_updated_at
+    BEFORE UPDATE ON ai_recommendations
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_ai_learning_updated_at
+    BEFORE UPDATE ON ai_learning
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_ai_workflows_updated_at
+    BEFORE UPDATE ON ai_workflows
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_ai_governance_updated_at
+    BEFORE UPDATE ON ai_governance
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();

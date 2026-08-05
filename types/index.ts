@@ -144,3 +144,6 @@ export * from './billing';
 
 // Re-export Sprint 19 Analytics Types
 export * from './analytics';
+
+// Re-export Sprint 20 AIOps Types
+export * from './aiops';
