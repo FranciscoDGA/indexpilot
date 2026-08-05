@@ -1044,13 +1044,19 @@ export function createMockSupabaseClient() {
         error: null,
       }),
       signInWithPassword: async ({ email, password }: any) => {
-        if (email === 'demo@example.com' && password === 'demo') {
-          return { data: { session: mockSession }, error: null };
-        }
-        return {
-          data: null,
-          error: { message: 'Invalid credentials' },
+        // In mock mode, accept any email/password combination
+        const mockUserForLogin = {
+          id: 'mock-user-123',
+          email: email || 'demo@example.com',
+          user_metadata: {
+            full_name: email?.split('@')[0] || 'Demo User',
+          },
         };
+        const mockSessionForLogin = {
+          user: mockUserForLogin,
+          access_token: 'mock-token',
+        };
+        return { data: { session: mockSessionForLogin }, error: null };
       },
       signUp: async ({ email, password }: any) => {
         return {
