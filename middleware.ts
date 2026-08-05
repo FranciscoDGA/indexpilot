@@ -4,10 +4,11 @@ import type { NextRequest } from 'next/server';
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // In mock mode (development), allow access to all routes
+  // In mock mode OR when Supabase credentials are missing, allow all routes
   const useMock = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
+  const hasSupabase = !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (useMock) {
+  if (useMock || !hasSupabase) {
     // Redirect root to dashboard in mock mode
     if (pathname === '/') {
       return NextResponse.redirect(new URL('/dashboard', request.url));
