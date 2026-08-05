@@ -21,7 +21,7 @@ export class ContentDecayEngine {
 
     if (error) throw error;
 
-    return (decayItems || []).map((item) => ({
+    return (decayItems || []).map((item: any) => ({
       url: item.url,
       metric_type: item.metric_type as
         | 'impressions'
@@ -236,7 +236,7 @@ export class ContentDecayEngine {
 
     if (error) throw error;
 
-    return (alerts || []).map((alert) => ({
+    return (alerts || []).map((alert: any) => ({
       url: alert.url,
       metric_type: alert.metric_type as
         | 'impressions'
@@ -274,19 +274,19 @@ export class ContentDecayEngine {
 
     const items = allDecay || [];
     const contentInDecay = items.length;
-    const criticalAlerts = items.filter((i) => i.alert_level === 'CRITICAL').length;
-    const highAlerts = items.filter((i) => i.alert_level === 'HIGH').length;
+    const criticalAlerts = items.filter((i: any) => i.alert_level === 'CRITICAL').length;
+    const highAlerts = items.filter((i: any) => i.alert_level === 'HIGH').length;
     const avgDecayPercentage =
       contentInDecay > 0
         ? Math.round(
-            items.reduce((sum, i) => sum + i.decay_percentage, 0) / contentInDecay
+            items.reduce((sum: number, i: any) => sum + i.decay_percentage, 0) / contentInDecay
           )
         : 0;
 
     // Find most common root cause
-    const causes = items.map((i) => i.root_cause || 'Unknown');
+    const causes = items.map((i: any) => i.root_cause || 'Unknown');
     const causeCounts: Record<string, number> = {};
-    causes.forEach((cause) => {
+    causes.forEach((cause: string) => {
       causeCounts[cause] = (causeCounts[cause] || 0) + 1;
     });
 
@@ -356,16 +356,16 @@ export class ContentDecayEngine {
 
     if (error) throw error;
 
-    const trends = (allContent || []).map((c) => c.trend);
+    const trends = (allContent || []).map((c: any) => c.trend);
     const uniqueUrls = new Set(trends);
 
     return {
-      stableContent: (allContent || []).filter((c) => c.trend === 'stable').length,
+      stableContent: (allContent || []).filter((c: any) => c.trend === 'stable').length,
       decliningContent: (allContent || []).filter(
-        (c) => c.trend === 'declining'
+        (c: any) => c.trend === 'declining'
       ).length,
       improvingContent: (allContent || []).filter(
-        (c) => c.trend === 'improving'
+        (c: any) => c.trend === 'improving'
       ).length,
     };
   }

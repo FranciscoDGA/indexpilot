@@ -28,7 +28,7 @@ export class DiscoverReadinessEngine {
 
     if (error) throw error;
 
-    return (articles || []).map((article) => ({
+    return (articles || []).map((article: any) => ({
       url: article.url,
       overall_score: this.calculateReadinessScore(),
       image_quality: Math.random() * 100,

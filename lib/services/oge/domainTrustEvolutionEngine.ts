@@ -90,7 +90,7 @@ export class DomainTrustEvolutionEngine {
 
     if (!velocity || velocity.length === 0) return 50;
 
-    const avgHours = velocity.reduce((sum, v) => sum + (v.publish_to_crawl_hours || 48), 0) / velocity.length;
+    const avgHours = velocity.reduce((sum: number, v: any) => sum + (v.publish_to_crawl_hours || 48), 0) / velocity.length;
     // Ideal: <2 hours = 100, >48 hours = 0
     return Math.max(0, Math.min(100, 100 - (avgHours / 48) * 100));
   }
@@ -109,7 +109,7 @@ export class DomainTrustEvolutionEngine {
 
     if (!velocity || velocity.length === 0) return 50;
 
-    const avgHours = velocity.reduce((sum, v) => sum + (v.crawl_to_index_hours || 24), 0) / velocity.length;
+    const avgHours = velocity.reduce((sum: number, v: any) => sum + (v.crawl_to_index_hours || 24), 0) / velocity.length;
     // Ideal: <2 hours = 100, >48 hours = 0
     return Math.max(0, Math.min(100, 100 - (avgHours / 48) * 100));
   }
@@ -129,7 +129,7 @@ export class DomainTrustEvolutionEngine {
 
     if (!velocity || velocity.length === 0) return 50;
 
-    const avgHours = velocity.reduce((sum, v) => sum + (v.index_to_impression_hours || 72), 0) / velocity.length;
+    const avgHours = velocity.reduce((sum: number, v: any) => sum + (v.index_to_impression_hours || 72), 0) / velocity.length;
     // Ideal: <24 hours = 100, >192 hours = 0
     return Math.max(0, Math.min(100, 100 - (avgHours / 192) * 100));
   }
@@ -148,7 +148,7 @@ export class DomainTrustEvolutionEngine {
 
     if (!velocity || velocity.length === 0) return 50;
 
-    const avgHours = velocity.reduce((sum, v) => sum + (v.impression_to_click_hours || 120), 0) / velocity.length;
+    const avgHours = velocity.reduce((sum: number, v: any) => sum + (v.impression_to_click_hours || 120), 0) / velocity.length;
     // Ideal: <48 hours = 100, >720 hours = 0
     return Math.max(0, Math.min(100, 100 - (avgHours / 720) * 100));
   }
@@ -188,7 +188,7 @@ export class DomainTrustEvolutionEngine {
 
     if (!content || content.length === 0) return 50;
 
-    const fresh = content.filter((c) => c.days_since_update <= 90).length;
+    const fresh = content.filter((c: any) => c.days_since_update <= 90).length;
     return (fresh / content.length) * 100;
   }
 

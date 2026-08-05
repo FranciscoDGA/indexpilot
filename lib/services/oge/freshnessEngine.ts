@@ -57,7 +57,7 @@ export class FreshnessEngine {
     if (error) throw error;
 
     return (contentItems || [])
-      .map((item) => ({
+      .map((item: any) => ({
         url: item.url,
         days_since_update: item.days_since_update,
         freshness_score: item.freshness_score,
@@ -81,7 +81,7 @@ export class FreshnessEngine {
           item.impressions
         ),
       }))
-      .sort((a, b) => b.potential_impression_gain - a.potential_impression_gain);
+      .sort((a: any, b: any) => b.potential_impression_gain - a.potential_impression_gain);
   }
 
   /**
@@ -293,21 +293,21 @@ export class FreshnessEngine {
     }
 
     const avgDaysSinceUpdate = Math.round(
-      (content || []).reduce((sum, c) => sum + c.days_since_update, 0) / total
+      (content || []).reduce((sum: number, c: any) => sum + c.days_since_update, 0) / total
     );
 
     const avgFreshnessScore = Math.round(
-      (content || []).reduce((sum, c) => sum + c.freshness_score, 0) / total
+      (content || []).reduce((sum: number, c: any) => sum + c.freshness_score, 0) / total
     );
 
     const veryStaleCount = (content || []).filter(
-      (c) => c.days_since_update > 180
+      (c: any) => c.days_since_update > 180
     ).length;
     const staleCount = (content || []).filter(
-      (c) => c.days_since_update > 90 && c.days_since_update <= 180
+      (c: any) => c.days_since_update > 90 && c.days_since_update <= 180
     ).length;
     const freshCount = (content || []).filter(
-      (c) => c.days_since_update <= 30
+      (c: any) => c.days_since_update <= 30
     ).length;
 
     return {

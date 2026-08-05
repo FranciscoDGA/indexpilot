@@ -32,7 +32,7 @@ export class ContentOpportunityFinder {
 
     if (error) throw error;
 
-    const opportunities: ContentOpportunity[] = (articles || []).map((article) => ({
+    const opportunities: ContentOpportunity[] = (articles || []).map((article: any) => ({
       keyword: article.keyword,
       type: this.determineOpportunityType(article.impressions, article.position),
       gsc_impressions: article.impressions || 0,

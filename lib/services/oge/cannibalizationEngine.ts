@@ -30,7 +30,7 @@ export class CannibalizationEngine {
 
     // Group by keyword
     const keywordGroups: Record<string, any[]> = {};
-    (articles || []).forEach((article) => {
+    (articles || []).forEach((article: { keyword: string; url: string; position: number; impressions: number }) => {
       if (!keywordGroups[article.keyword]) {
         keywordGroups[article.keyword] = [];
       }

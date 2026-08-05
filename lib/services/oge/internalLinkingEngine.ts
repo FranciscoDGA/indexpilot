@@ -67,7 +67,7 @@ export class InternalLinkingEngine {
     const suggestions: LinkSuggestion[] = [];
 
     // Generate link suggestions based on keyword relevance
-    (allPages || []).forEach((page) => {
+    (allPages || []).forEach((page: any) => {
       const relevanceScore = this.calculateLinkRelevance(
         orphanKeyword || '',
         page.keyword

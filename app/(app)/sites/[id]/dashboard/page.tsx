@@ -59,15 +59,15 @@ export default function SiteDashboardPage({ params }: { params: { id: string } }
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const todayCount = publications.filter(
-        (p) => new Date(p.created_at) >= today
+        (p: { created_at: string }) => new Date(p.created_at) >= today
       ).length;
       const pending = publications.filter(
-        (p) => p.status === 'RECEIVED' || p.status === 'PROCESSING'
+        (p: { status: string }) => p.status === 'RECEIVED' || p.status === 'PROCESSING'
       ).length;
       const processed = publications.filter(
-        (p) => p.status === 'INDEXED' || p.status === 'ERROR'
+        (p: { status: string }) => p.status === 'INDEXED' || p.status === 'ERROR'
       ).length;
-      const indexed = publications.filter((p) => p.status === 'INDEXED').length;
+      const indexed = publications.filter((p: { status: string }) => p.status === 'INDEXED').length;
       const successRate = total > 0 ? (indexed / total) * 100 : 0;
       const lastPub = publications[0];
 

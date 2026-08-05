@@ -55,7 +55,7 @@ export default function PublicationsPage() {
       const { data: pubData } = await supabase
         .from('publication_queue')
         .select('*, sites(*)')
-        .in('site_id', sitesData?.map((s) => s.id) || [])
+        .in('site_id', sitesData?.map((s: { id: string }) => s.id) || [])
         .order('created_at', { ascending: false });
 
       setPublications(pubData || []);

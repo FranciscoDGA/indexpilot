@@ -36,7 +36,7 @@ export class TopicClusterEngine {
 
     if (clustersError) throw clustersError;
 
-    const gaps: ClusterGap[] = (clusters || []).map((cluster) => {
+    const gaps: ClusterGap[] = (clusters || []).map((cluster: any) => {
       const articles = (cluster.cluster_articles || []) as ClusterArticle[];
       const missingCount = Math.max(
         0,
@@ -286,16 +286,16 @@ export class TopicClusterEngine {
 
     const totalClusters = (clusters || []).length;
     const completeCluster = (clusters || []).filter(
-      (c) => c.completeness_score >= 80
+      (c: any) => c.completeness_score >= 80
     ).length;
     const avgCompletenessScore =
       totalClusters > 0
-        ? (clusters || []).reduce((sum, c) => sum + c.completeness_score, 0) /
+        ? (clusters || []).reduce((sum: number, c: any) => sum + c.completeness_score, 0) /
           totalClusters
         : 0;
 
     const totalImpressions = (articles || []).reduce(
-      (sum, a) => sum + (a.impressions || 0),
+      (sum: number, a: any) => sum + (a.impressions || 0),
       0
     );
 

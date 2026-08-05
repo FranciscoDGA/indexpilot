@@ -381,15 +381,15 @@ export class GrowthSimulator {
       };
     }
 
-    const accurate = predictions.filter((p) => p.prediction_accuracy >= 80 && p.prediction_accuracy <= 120).length;
+    const accurate = predictions.filter((p: any) => p.prediction_accuracy >= 80 && p.prediction_accuracy <= 120).length;
     const accuracyPercentage = (accurate / predictions.length) * 100;
 
     // Check trend (last 5 vs previous 5)
     const recent = predictions.slice(0, 5);
     const previous = predictions.slice(5, 10);
 
-    const recentAccuracy = recent.reduce((sum, p) => sum + (p.prediction_accuracy || 0), 0) / recent.length;
-    const previousAccuracy = previous.length > 0 ? previous.reduce((sum, p) => sum + (p.prediction_accuracy || 0), 0) / previous.length : recentAccuracy;
+    const recentAccuracy = recent.reduce((sum: number, p: any) => sum + (p.prediction_accuracy || 0), 0) / recent.length;
+    const previousAccuracy = previous.length > 0 ? previous.reduce((sum: number, p: any) => sum + (p.prediction_accuracy || 0), 0) / previous.length : recentAccuracy;
 
     const trend = recentAccuracy > previousAccuracy * 1.02 ? 'improving' : recentAccuracy < previousAccuracy * 0.98 ? 'declining' : 'stable';
 

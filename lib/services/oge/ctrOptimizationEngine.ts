@@ -17,7 +17,7 @@ export class CTROptimizationEngine {
     if (error) throw error;
 
     return (analyses || [])
-      .map((analysis) => ({
+      .map((analysis: any) => ({
         keyword: analysis.keyword,
         position: analysis.position,
         current_ctr: analysis.ctr,
@@ -36,8 +36,8 @@ export class CTROptimizationEngine {
           analysis.position
         ),
       }))
-      .filter((gap) => gap.gap_percentage > 0)
-      .sort((a, b) => {
+      .filter((gap: any) => gap.gap_percentage > 0)
+      .sort((a: any, b: any) => {
         const impactA = a.gap_percentage * a.impressions;
         const impactB = b.gap_percentage * b.impressions;
         return impactB - impactA;

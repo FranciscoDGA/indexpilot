@@ -898,3 +898,209 @@ CREATE TRIGGER update_search_performance_updated_at
     BEFORE UPDATE ON search_performance
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- SPRINT 11: CMS CONNECTORS & AUTO SYNC PLATFORM
+-- ============================================
+
+-- ============================================
+-- CONNECTORS TABLE
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS connectors (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+    type VARCHAR(30) NOT NULL CHECK (type IN ('cms', 'headless_cms', 'framework', 'ssg', 'ecommerce', 'custom')),
+    provider VARCHAR(50) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    status VARCHAR(20) DEFAULT 'inactive' CHECK (status IN ('active', 'inactive', 'error', 'syncing')),
+
+    config JSONB DEFAULT '{}',
+    credentials_encrypted TEXT,
+    version VARCHAR(20) DEFAULT '1.0.0',
+
+    last_sync_at TIMESTAMP WITH TIME ZONE,
+    last_error TEXT,
+    sync_count INTEGER DEFAULT 0,
+    event_count INTEGER DEFAULT 0,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+    UNIQUE(site_id, provider, name)
+);
+
+CREATE INDEX idx_connectors_site_id ON connectors(site_id);
+CREATE INDEX idx_connectors_user_id ON connectors(user_id);
+CREATE INDEX idx_connectors_status ON connectors(site_id, status);
+CREATE INDEX idx_connectors_provider ON connectors(site_id, provider);
+
+-- ============================================
+-- CONNECTOR_EVENTS TABLE
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS connector_events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    connector_id UUID NOT NULL REFERENCES connectors(id) ON DELETE CASCADE,
+
+    event_type VARCHAR(50) NOT NULL CHECK (event_type IN ('publish', 'update', 'delete', 'draft', 'scheduled', 'restore', 'deploy', 'push')),
+    payload JSONB DEFAULT '{}',
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'skipped')),
+
+    source_url VARCHAR(2000),
+    content_hash VARCHAR(64),
+    impact_level VARCHAR(20) CHECK (impact_level IN ('critical', 'high', 'medium', 'low')),
+
+    received_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    processed_at TIMESTAMP WITH TIME ZONE,
+    error_message TEXT,
+    retry_count INTEGER DEFAULT 0
+);
+
+CREATE INDEX idx_connector_events_connector_id ON connector_events(connector_id);
+CREATE INDEX idx_connector_events_status ON connector_events(status);
+CREATE INDEX idx_connector_events_type ON connector_events(event_type);
+CREATE INDEX idx_connector_events_received_at ON connector_events(received_at DESC);
+
+-- ============================================
+-- SYNC_JOBS TABLE
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS sync_jobs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    connector_id UUID NOT NULL REFERENCES connectors(id) ON DELETE CASCADE,
+    site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled')),
+    trigger_type VARCHAR(30) DEFAULT 'manual' CHECK (trigger_type IN ('manual', 'webhook', 'polling', 'scheduled', 'deploy', 'git')),
+
+    started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    finished_at TIMESTAMP WITH TIME ZONE,
+    duration_ms INTEGER,
+
+    items_processed INTEGER DEFAULT 0,
+    items_created INTEGER DEFAULT 0,
+    items_updated INTEGER DEFAULT 0,
+    items_removed INTEGER DEFAULT 0,
+    items_failed INTEGER DEFAULT 0,
+
+    error_message TEXT,
+    metadata JSONB DEFAULT '{}',
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_sync_jobs_connector_id ON sync_jobs(connector_id);
+CREATE INDEX idx_sync_jobs_site_id ON sync_jobs(site_id);
+CREATE INDEX idx_sync_jobs_status ON sync_jobs(status);
+CREATE INDEX idx_sync_jobs_created_at ON sync_jobs(created_at DESC);
+
+-- ============================================
+-- CONTENT_VERSIONS TABLE
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS content_versions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    url_id UUID NOT NULL REFERENCES urls(id) ON DELETE CASCADE,
+    connector_id UUID REFERENCES connectors(id) ON DELETE SET NULL,
+    site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+    version INTEGER NOT NULL DEFAULT 1,
+    content_hash VARCHAR(64) NOT NULL,
+
+    title VARCHAR(255),
+    content_snapshot JSONB DEFAULT '{}',
+
+    published_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_content_versions_url_id ON content_versions(url_id);
+CREATE INDEX idx_content_versions_connector_id ON content_versions(connector_id);
+CREATE INDEX idx_content_versions_hash ON content_versions(content_hash);
+
+-- ============================================
+-- ENABLE RLS FOR SPRINT 11 TABLES
+-- ============================================
+
+ALTER TABLE connectors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE connector_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sync_jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE content_versions ENABLE ROW LEVEL SECURITY;
+
+-- Connectors: Users can only access their own connectors
+CREATE POLICY "Users can view own connectors"
+    ON connectors FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own connectors"
+    ON connectors FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own connectors"
+    ON connectors FOR UPDATE
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own connectors"
+    ON connectors FOR DELETE
+    USING (auth.uid() = user_id);
+
+-- Connector Events: Users can access events for their connectors
+CREATE POLICY "Users can view own connector events"
+    ON connector_events FOR SELECT
+    USING (
+        connector_id IN (
+            SELECT id FROM connectors WHERE user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can insert own connector events"
+    ON connector_events FOR INSERT
+    WITH CHECK (
+        connector_id IN (
+            SELECT id FROM connectors WHERE user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can update own connector events"
+    ON connector_events FOR UPDATE
+    USING (
+        connector_id IN (
+            SELECT id FROM connectors WHERE user_id = auth.uid()
+        )
+    );
+
+-- Sync Jobs: Users can only access their own sync jobs
+CREATE POLICY "Users can view own sync jobs"
+    ON sync_jobs FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own sync jobs"
+    ON sync_jobs FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own sync jobs"
+    ON sync_jobs FOR UPDATE
+    USING (auth.uid() = user_id);
+
+-- Content Versions: Users can only access their own content versions
+CREATE POLICY "Users can view own content versions"
+    ON content_versions FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own content versions"
+    ON content_versions FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+-- ============================================
+-- TRIGGERS FOR SPRINT 11 TABLES
+-- ============================================
+
+CREATE TRIGGER update_connectors_updated_at
+    BEFORE UPDATE ON connectors
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();

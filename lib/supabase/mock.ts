@@ -757,6 +757,212 @@ const mockActions = [
   },
 ];
 
+// ============================================================================
+// SPRINT 11: CMS CONNECTORS MOCK DATA
+// ============================================================================
+
+const mockConnectors = [
+  {
+    id: 'conn-1',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    type: 'cms',
+    provider: 'wordpress',
+    name: 'WordPress Principal',
+    status: 'active',
+    config: { api_url: 'https://techblog.com/wp-json' },
+    version: '1.0.0',
+    last_sync_at: new Date(Date.now() - 3600000).toISOString(),
+    last_error: null,
+    sync_count: 12,
+    event_count: 45,
+    created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    updated_at: new Date(Date.now() - 3600000).toISOString(),
+  },
+  {
+    id: 'conn-2',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    type: 'headless_cms',
+    provider: 'strapi',
+    name: 'Strapi CMS',
+    status: 'active',
+    config: { api_url: 'https://cms.newscenter.io/api' },
+    version: '1.0.0',
+    last_sync_at: new Date(Date.now() - 7200000).toISOString(),
+    last_error: null,
+    sync_count: 8,
+    event_count: 23,
+    created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+    updated_at: new Date(Date.now() - 7200000).toISOString(),
+  },
+  {
+    id: 'conn-3',
+    site_id: 'site-2',
+    user_id: 'mock-user-123',
+    type: 'framework',
+    provider: 'nextjs',
+    name: 'Next.js Site',
+    status: 'inactive',
+    config: { api_url: 'https://newscenter.io' },
+    version: '1.0.0',
+    last_sync_at: null,
+    last_error: null,
+    sync_count: 0,
+    event_count: 0,
+    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    updated_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+];
+
+const mockConnectorEvents = [
+  {
+    id: 'evt-1',
+    connector_id: 'conn-1',
+    event_type: 'publish',
+    payload: { title: 'React 19 Novidades', url: 'https://techblog.com/react-19' },
+    status: 'completed',
+    source_url: 'https://techblog.com/react-19',
+    content_hash: 'abc123def456',
+    impact_level: 'high',
+    received_at: new Date(Date.now() - 3600000).toISOString(),
+    processed_at: new Date(Date.now() - 3500000).toISOString(),
+    error_message: null,
+    retry_count: 0,
+  },
+  {
+    id: 'evt-2',
+    connector_id: 'conn-1',
+    event_type: 'update',
+    payload: { title: 'Guia Docker Atualizado', url: 'https://techblog.com/docker-guide' },
+    status: 'completed',
+    source_url: 'https://techblog.com/docker-guide',
+    content_hash: 'xyz789',
+    impact_level: 'medium',
+    received_at: new Date(Date.now() - 7200000).toISOString(),
+    processed_at: new Date(Date.now() - 7100000).toISOString(),
+    error_message: null,
+    retry_count: 0,
+  },
+  {
+    id: 'evt-3',
+    connector_id: 'conn-2',
+    event_type: 'publish',
+    payload: { title: 'API Design Patterns', url: 'https://newscenter.io/api-design' },
+    status: 'pending',
+    source_url: 'https://newscenter.io/api-design',
+    content_hash: 'def456ghi789',
+    impact_level: 'high',
+    received_at: new Date(Date.now() - 1800000).toISOString(),
+    processed_at: null,
+    error_message: null,
+    retry_count: 0,
+  },
+  {
+    id: 'evt-4',
+    connector_id: 'conn-1',
+    event_type: 'delete',
+    payload: { title: 'Post Antigo Removido', url: 'https://techblog.com/old-post' },
+    status: 'completed',
+    source_url: 'https://techblog.com/old-post',
+    content_hash: null,
+    impact_level: 'low',
+    received_at: new Date(Date.now() - 86400000).toISOString(),
+    processed_at: new Date(Date.now() - 86300000).toISOString(),
+    error_message: null,
+    retry_count: 0,
+  },
+];
+
+const mockSyncJobs = [
+  {
+    id: 'sync-1',
+    connector_id: 'conn-1',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    status: 'completed',
+    trigger_type: 'webhook',
+    started_at: new Date(Date.now() - 3600000).toISOString(),
+    finished_at: new Date(Date.now() - 3597660).toISOString(),
+    duration_ms: 2340,
+    items_processed: 5,
+    items_created: 1,
+    items_updated: 2,
+    items_removed: 0,
+    items_failed: 0,
+    error_message: null,
+    metadata: {},
+    created_at: new Date(Date.now() - 3600000).toISOString(),
+  },
+  {
+    id: 'sync-2',
+    connector_id: 'conn-2',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    status: 'running',
+    trigger_type: 'polling',
+    started_at: new Date(Date.now() - 60000).toISOString(),
+    finished_at: null,
+    duration_ms: null,
+    items_processed: 3,
+    items_created: 0,
+    items_updated: 1,
+    items_removed: 0,
+    items_failed: 0,
+    error_message: null,
+    metadata: {},
+    created_at: new Date(Date.now() - 60000).toISOString(),
+  },
+  {
+    id: 'sync-3',
+    connector_id: 'conn-1',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    status: 'failed',
+    trigger_type: 'manual',
+    started_at: new Date(Date.now() - 86400000).toISOString(),
+    finished_at: new Date(Date.now() - 86395000).toISOString(),
+    duration_ms: 5000,
+    items_processed: 0,
+    items_created: 0,
+    items_updated: 0,
+    items_removed: 0,
+    items_failed: 1,
+    error_message: 'Connection timeout - could not reach WordPress API',
+    metadata: {},
+    created_at: new Date(Date.now() - 86400000).toISOString(),
+  },
+];
+
+const mockContentVersions = [
+  {
+    id: 'cv-1',
+    url_id: 'url-1',
+    connector_id: 'conn-1',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    version: 1,
+    content_hash: 'abc123def456',
+    title: 'Guia Completo React',
+    content_snapshot: { title: 'Guia Completo React', description: 'Aprenda React do zero', content: 'Conteudo completo...' },
+    published_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+    created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'cv-2',
+    url_id: 'url-1',
+    connector_id: 'conn-1',
+    site_id: 'site-1',
+    user_id: 'mock-user-123',
+    version: 2,
+    content_hash: 'def456ghi789',
+    title: 'Guia Completo React 2024',
+    content_snapshot: { title: 'Guia Completo React 2024', description: 'Aprenda React 19', content: 'Conteudo atualizado...' },
+    published_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+];
+
 type QueryBuilder = {
   eq: (field: string, value: any) => QueryBuilder;
   in: (field: string, values: any[]) => QueryBuilder;
@@ -910,6 +1116,18 @@ export function createMockSupabaseClient() {
           break;
         case 'actions':
           data = mockActions;
+          break;
+        case 'connectors':
+          data = mockConnectors;
+          break;
+        case 'connector_events':
+          data = mockConnectorEvents;
+          break;
+        case 'sync_jobs':
+          data = mockSyncJobs;
+          break;
+        case 'content_versions':
+          data = mockContentVersions;
           break;
         case 'users':
           data = [

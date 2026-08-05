@@ -41,27 +41,27 @@ export default function DashboardPage() {
           .select('id, status, created_at')
           .in(
             'site_id',
-            sitesData?.map((s) => s.id) || []
+            sitesData?.map((s: { id: string }) => s.id) || []
           );
 
         const totalUrls = pubData?.length || 0;
-        const totalIndexed = pubData?.filter((p) => p.status === 'INDEXED').length || 0;
-        const totalErrors = pubData?.filter((p) => p.status === 'ERROR').length || 0;
+        const totalIndexed = pubData?.filter((p: { status: string }) => p.status === 'INDEXED').length || 0;
+        const totalErrors = pubData?.filter((p: { status: string }) => p.status === 'ERROR').length || 0;
 
         // Today's publications
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const urlsToday =
-          pubData?.filter((p) => new Date(p.created_at) >= today).length || 0;
+          pubData?.filter((p: { created_at: string }) => new Date(p.created_at) >= today).length || 0;
 
         // Pending publications
         const urlsPending =
-          pubData?.filter((p) => p.status === 'RECEIVED' || p.status === 'PROCESSING')
+          pubData?.filter((p: { status: string }) => p.status === 'RECEIVED' || p.status === 'PROCESSING')
             .length || 0;
 
         // Last publication
         const lastPublication = pubData?.sort(
-          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          (a: { created_at: string }, b: { created_at: string }) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )[0] as PublicationQueue | undefined;
 
         setMetrics({

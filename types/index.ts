@@ -120,3 +120,6 @@ export interface SiteDashboardMetrics {
   successRate: number;
   lastPublicationAt: string | null;
 }
+
+// Re-export Sprint 11 Connector Types
+export * from './connectors';
