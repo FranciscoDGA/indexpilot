@@ -1327,3 +1327,172 @@ CREATE TRIGGER update_developer_apps_updated_at
     BEFORE UPDATE ON developer_apps
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- SPRINT 13: REAL-TIME MONITORING TABLES
+-- ============================================
+
+-- Monitoring Events (core event log)
+CREATE TABLE IF NOT EXISTS monitoring_events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    event_type VARCHAR(100) NOT NULL,
+    severity VARCHAR(20) DEFAULT 'low' CHECK (severity IN ('critical', 'high', 'medium', 'low', 'info')),
+    source VARCHAR(100) NOT NULL,
+    payload JSONB DEFAULT '{}',
+    detected_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    processed_at TIMESTAMP WITH TIME ZONE,
+    acknowledged_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Change History (field-level tracking)
+CREATE TABLE IF NOT EXISTS change_history (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    url TEXT,
+    field VARCHAR(100) NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    change_type VARCHAR(20) DEFAULT 'modified' CHECK (change_type IN ('added', 'modified', 'removed')),
+    detected_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Incidents
+CREATE TABLE IF NOT EXISTS incidents (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    severity VARCHAR(20) DEFAULT 'medium' CHECK (severity IN ('critical', 'high', 'medium', 'low')),
+    status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'investigating', 'resolved', 'closed')),
+    source VARCHAR(100),
+    metadata JSONB DEFAULT '{}',
+    opened_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    resolved_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Monitoring Rules
+CREATE TABLE IF NOT EXISTS monitoring_rules (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workspace_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    trigger_type VARCHAR(100) NOT NULL,
+    trigger_config JSONB DEFAULT '{}',
+    action_type VARCHAR(100) NOT NULL,
+    action_config JSONB DEFAULT '{}',
+    enabled BOOLEAN DEFAULT TRUE,
+    last_triggered_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Notification Preferences
+CREATE TABLE IF NOT EXISTS notification_preferences (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    channel VARCHAR(50) NOT NULL CHECK (channel IN ('email', 'slack', 'discord', 'telegram', 'webhook', 'push')),
+    minimum_severity VARCHAR(20) DEFAULT 'medium' CHECK (minimum_severity IN ('critical', 'high', 'medium', 'low')),
+    enabled BOOLEAN DEFAULT TRUE,
+    config JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Monitoring Snapshots (point-in-time site state)
+CREATE TABLE IF NOT EXISTS monitoring_snapshots (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    url TEXT NOT NULL,
+    status_code INTEGER,
+    response_time_ms INTEGER,
+    content_hash VARCHAR(64),
+    title TEXT,
+    meta_description TEXT,
+    canonical TEXT,
+    robots TEXT,
+    h1 TEXT,
+    schema_type TEXT,
+    internal_links_count INTEGER,
+    external_links_count INTEGER,
+    images_count INTEGER,
+    word_count INTEGER,
+    snapshot JSONB DEFAULT '{}',
+    captured_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- INDEXES FOR SPRINT 13
+-- ============================================
+
+CREATE INDEX IF NOT EXISTS idx_monitoring_events_site ON monitoring_events(site_id);
+CREATE INDEX IF NOT EXISTS idx_monitoring_events_type ON monitoring_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_monitoring_events_severity ON monitoring_events(severity);
+CREATE INDEX IF NOT EXISTS idx_monitoring_events_detected ON monitoring_events(detected_at);
+CREATE INDEX IF NOT EXISTS idx_change_history_site ON change_history(site_id);
+CREATE INDEX IF NOT EXISTS idx_change_history_url ON change_history(url);
+CREATE INDEX IF NOT EXISTS idx_change_history_detected ON change_history(detected_at);
+CREATE INDEX IF NOT EXISTS idx_incidents_site ON incidents(site_id);
+CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents(status);
+CREATE INDEX IF NOT EXISTS idx_incidents_severity ON incidents(severity);
+CREATE INDEX IF NOT EXISTS idx_monitoring_rules_workspace ON monitoring_rules(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_notification_preferences_user ON notification_preferences(user_id);
+CREATE INDEX IF NOT EXISTS idx_monitoring_snapshots_site ON monitoring_snapshots(site_id);
+CREATE INDEX IF NOT EXISTS idx_monitoring_snapshots_url ON monitoring_snapshots(url);
+CREATE INDEX IF NOT EXISTS idx_monitoring_snapshots_captured ON monitoring_snapshots(captured_at);
+
+-- ============================================
+-- RLS POLICIES FOR SPRINT 13
+-- ============================================
+
+-- Monitoring Events
+CREATE POLICY "Users can view own monitoring events"
+    ON monitoring_events FOR SELECT
+    USING (site_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+-- Change History
+CREATE POLICY "Users can view own change history"
+    ON change_history FOR SELECT
+    USING (site_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+-- Incidents
+CREATE POLICY "Users can view own incidents"
+    ON incidents FOR SELECT
+    USING (site_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own incidents"
+    ON incidents FOR ALL
+    USING (site_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+-- Monitoring Rules
+CREATE POLICY "Users can view own monitoring rules"
+    ON monitoring_rules FOR SELECT
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own monitoring rules"
+    ON monitoring_rules FOR ALL
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+-- Notification Preferences
+CREATE POLICY "Users can view own notification preferences"
+    ON notification_preferences FOR SELECT
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Users can manage own notification preferences"
+    ON notification_preferences FOR ALL
+    USING (user_id = auth.uid());
+
+-- Monitoring Snapshots
+CREATE POLICY "Users can view own monitoring snapshots"
+    ON monitoring_snapshots FOR SELECT
+    USING (site_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+-- ============================================
+-- TRIGGERS FOR SPRINT 13
+-- ============================================
+
+CREATE TRIGGER update_monitoring_rules_updated_at
+    BEFORE UPDATE ON monitoring_rules
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
