@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
+import { Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -44,13 +45,13 @@ export default function LoginPage() {
       <CardContent>
         <form onSubmit={handleLogin} className="space-y-4">
           {error && (
-            <div className="p-3 rounded-md bg-red-50 dark:bg-red-950/30 text-red-900 dark:text-red-400 text-sm">
+            <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
               {error}
             </div>
           )}
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Email</label>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-foreground">Email</label>
             <Input
               type="email"
               placeholder="seu@email.com"
@@ -61,8 +62,8 @@ export default function LoginPage() {
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Senha</label>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-foreground">Senha</label>
             <Input
               type="password"
               placeholder="••••••••"
@@ -74,13 +75,20 @@ export default function LoginPage() {
           </div>
 
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Entrando...' : 'Acessar'}
+            {loading ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                Entrando...
+              </>
+            ) : (
+              'Acessar'
+            )}
           </Button>
         </form>
 
         <div className="mt-4 text-center text-sm text-muted-foreground">
           Não tem conta?{' '}
-          <Link href="/signup" className="font-medium text-primary hover:underline">
+          <Link href="/signup" className="font-medium text-foreground hover:underline">
             Criar conta
           </Link>
         </div>

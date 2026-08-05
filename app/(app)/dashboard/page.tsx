@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card, CardContent, CardTitle } from '@/components/common/Card';
+import { Globe, FileText, Clock, AlertCircle, Loader2 } from 'lucide-react';
 import type { DashboardMetrics, PublicationQueue } from '@/types';
 
 export default function DashboardPage() {
@@ -27,7 +28,6 @@ export default function DashboardPage() {
 
         if (!session) return;
 
-        // Fetch total sites
         const { data: sitesData } = await supabase
           .from('sites')
           .select('id')
@@ -35,7 +35,6 @@ export default function DashboardPage() {
 
         const totalSites = sitesData?.length || 0;
 
-        // Fetch publication metrics
         const { data: pubData } = await supabase
           .from('publication_queue')
           .select('id, status, created_at')
@@ -48,18 +47,15 @@ export default function DashboardPage() {
         const totalIndexed = pubData?.filter((p: { status: string }) => p.status === 'INDEXED').length || 0;
         const totalErrors = pubData?.filter((p: { status: string }) => p.status === 'ERROR').length || 0;
 
-        // Today's publications
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const urlsToday =
           pubData?.filter((p: { created_at: string }) => new Date(p.created_at) >= today).length || 0;
 
-        // Pending publications
         const urlsPending =
           pubData?.filter((p: { status: string }) => p.status === 'RECEIVED' || p.status === 'PROCESSING')
             .length || 0;
 
-        // Last publication
         const lastPublication = pubData?.sort(
           (a: { created_at: string }, b: { created_at: string }) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )[0] as PublicationQueue | undefined;
@@ -81,77 +77,68 @@ export default function DashboardPage() {
     };
 
     fetchMetrics();
-    const interval = setInterval(fetchMetrics, 30000); // Refresh every 30s
+    const interval = setInterval(fetchMetrics, 30000);
     return () => clearInterval(interval);
   }, []);
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const stats = [
+    { label: 'Sites', value: metrics.totalSites, icon: Globe, color: 'text-blue-600 dark:text-blue-400' },
+    { label: 'URLs Recebidas', value: metrics.totalUrls, icon: FileText, color: 'text-foreground' },
+    { label: 'Hoje', value: metrics.urlsToday, icon: Clock, color: 'text-emerald-600 dark:text-emerald-400' },
+    { label: 'Pendentes', value: metrics.urlsPending, icon: AlertCircle, color: 'text-amber-600 dark:text-amber-400' },
+  ];
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         title="Dashboard"
-        description="Visão geral da sua plataforma IndexPilot"
+        description="Visão geral da sua plataforma"
       />
 
-      {/* Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent>
-            <div className="text-3xl font-bold text-primary mb-2">
-              {metrics.totalSites}
-            </div>
-            <div className="text-sm text-muted-foreground">Sites</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent>
-            <div className="text-3xl font-bold text-primary mb-2">{metrics.totalUrls}</div>
-            <div className="text-sm text-muted-foreground">URLs Recebidas</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-600 mb-2">
-              {metrics.urlsToday}
-            </div>
-            <div className="text-sm text-muted-foreground">Hoje</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent>
-            <div className="text-3xl font-bold text-yellow-600 mb-2">
-              {metrics.urlsPending}
-            </div>
-            <div className="text-sm text-muted-foreground">Pendentes</div>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map((stat) => (
+          <Card key={stat.label}>
+            <CardContent className="flex items-center gap-4">
+              <div className={`flex items-center justify-center w-10 h-10 rounded-lg bg-muted ${stat.color}`}>
+                <stat.icon size={20} />
+              </div>
+              <div>
+                <div className="text-2xl font-semibold tracking-tight">{stat.value}</div>
+                <div className="text-xs text-muted-foreground">{stat.label}</div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      {/* Recent Activity */}
       <Card>
-        <div className="p-6 border-b border-border">
+        <div className="px-6 py-3 border-b border-border">
           <CardTitle>Atividade Recente</CardTitle>
         </div>
         <CardContent>
           {metrics.lastPublication ? (
-            <div className="space-y-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-medium">{metrics.lastPublication.title}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {metrics.lastPublication.url}
-                  </p>
-                </div>
-                <span className="text-sm text-muted-foreground">
-                  {new Date(metrics.lastPublication.created_at).toLocaleString('pt-BR')}
-                </span>
+            <div className="flex items-center justify-between">
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">{metrics.lastPublication.title}</p>
+                <p className="text-xs text-muted-foreground truncate mt-0.5">
+                  {metrics.lastPublication.url}
+                </p>
               </div>
+              <span className="text-xs text-muted-foreground whitespace-nowrap ml-4">
+                {new Date(metrics.lastPublication.created_at).toLocaleString('pt-BR')}
+              </span>
             </div>
           ) : (
             <div className="text-center py-8">
-              <p className="text-muted-foreground">Nenhuma atividade encontrada</p>
+              <p className="text-sm text-muted-foreground">Nenhuma atividade encontrada</p>
             </div>
           )}
         </CardContent>

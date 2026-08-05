@@ -9,7 +9,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`rounded-lg border border-border bg-card p-6 shadow-sm ${className}`}
+      className={`rounded-xl border border-border bg-card ${className}`}
     >
       {children}
     </div>
@@ -23,7 +23,7 @@ export function CardHeader({
   children: React.ReactNode;
   className?: string;
 }) {
-  return <div className={`mb-4 ${className}`}>{children}</div>;
+  return <div className={`px-6 py-4 border-b border-border ${className}`}>{children}</div>;
 }
 
 export function CardTitle({
@@ -33,7 +33,7 @@ export function CardTitle({
   children: React.ReactNode;
   className?: string;
 }) {
-  return <h2 className={`text-lg font-semibold ${className}`}>{children}</h2>;
+  return <h3 className={`text-[15px] font-semibold tracking-tight ${className}`}>{children}</h3>;
 }
 
 export function CardContent({
@@ -43,5 +43,5 @@ export function CardContent({
   children: React.ReactNode;
   className?: string;
 }) {
-  return <div className={className}>{children}</div>;
+  return <div className={`px-6 py-4 ${className}`}>{children}</div>;
 }

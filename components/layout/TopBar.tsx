@@ -1,13 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/common/Button';
-import type { User } from '@/types';
+import { LogOut, User, Settings, ChevronDown } from 'lucide-react';
+import type { User as UserType } from '@/types';
 
-export function TopBar({ user }: { user: User | null }) {
+export function TopBar({ user }: { user: UserType | null }) {
   const router = useRouter();
   const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleLogout = async () => {
     const { supabase } = await import('@/lib/supabase/client');
@@ -15,45 +26,64 @@ export function TopBar({ user }: { user: User | null }) {
     router.push('/login');
   };
 
+  const initials = (user?.full_name || user?.email || 'U')
+    .split(' ')
+    .map((n: string) => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
   return (
-    <header className="border-b border-border bg-card h-16 flex items-center justify-between px-6">
-      <div className="flex-1">
-        <h2 className="text-sm font-medium text-muted-foreground">Bem-vindo</h2>
-      </div>
+    <header className="h-14 border-b border-border bg-card flex items-center justify-between px-6">
+      <div className="flex-1" />
 
-      <div className="flex items-center gap-4">
-        <div className="relative">
-          <button
-            onClick={() => setShowMenu(!showMenu)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted transition-colors"
-          >
-            <span className="text-2xl">👤</span>
-            <span className="text-sm font-medium">{user?.full_name || user?.email}</span>
-          </button>
+      <div className="flex items-center gap-3" ref={menuRef}>
+        <button
+          onClick={() => setShowMenu(!showMenu)}
+          className="flex items-center gap-2.5 rounded-lg py-1.5 pl-1.5 pr-3 hover:bg-muted transition-colors"
+        >
+          <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+            {initials}
+          </div>
+          <span className="text-sm font-medium text-foreground max-w-[120px] truncate">
+            {user?.full_name || user?.email || 'User'}
+          </span>
+          <ChevronDown size={14} className="text-muted-foreground" />
+        </button>
 
-          {showMenu && (
-            <div className="absolute right-0 mt-2 w-48 rounded-lg border border-border bg-card shadow-lg z-50">
-              <a
-                href="/profile"
-                className="block px-4 py-2 text-sm text-foreground hover:bg-muted rounded-t-lg"
+        {showMenu && (
+          <div className="absolute right-6 top-12 w-56 rounded-lg border border-border bg-popover shadow-lg z-50 overflow-hidden">
+            <div className="px-3 py-2.5 border-b border-border">
+              <p className="text-sm font-medium text-foreground truncate">{user?.full_name || 'User'}</p>
+              <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+            </div>
+            <div className="py-1">
+              <button
+                onClick={() => { setShowMenu(false); router.push('/profile'); }}
+                className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
               >
+                <User size={15} className="text-muted-foreground" />
                 Perfil
-              </a>
-              <a
-                href="/settings"
-                className="block px-4 py-2 text-sm text-foreground hover:bg-muted"
+              </button>
+              <button
+                onClick={() => { setShowMenu(false); router.push('/settings'); }}
+                className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
               >
+                <Settings size={15} className="text-muted-foreground" />
                 Configurações
-              </a>
+              </button>
+            </div>
+            <div className="border-t border-border py-1">
               <button
                 onClick={handleLogout}
-                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-muted rounded-b-lg"
+                className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
               >
+                <LogOut size={15} />
                 Sair
               </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </header>
   );

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { TopBar } from '@/components/layout/TopBar';
+import { Loader2 } from 'lucide-react';
 import type { User } from '@/types';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -14,9 +15,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const getUser = async () => {
       try {
-        // Dynamic import to avoid build-time issues
         const { supabase } = await import('@/lib/supabase/client');
-
         const {
           data: { session },
         } = await supabase.auth.getSession();
@@ -47,9 +46,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin text-2xl mb-2">⏳</div>
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           <p className="text-sm text-muted-foreground">Carregando...</p>
         </div>
       </div>

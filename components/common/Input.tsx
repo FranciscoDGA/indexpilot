@@ -9,12 +9,12 @@ export const Input = React.forwardRef<
   <input
     ref={ref}
     className={`
-      flex w-full px-4 py-2 text-base
-      border border-input rounded-md
-      bg-background text-foreground
+      flex h-9 w-full rounded-lg border border-input bg-background px-3 py-2
+      text-sm text-foreground
       placeholder:text-muted-foreground
-      focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent
-      disabled:opacity-50 disabled:cursor-not-allowed
+      focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1
+      disabled:cursor-not-allowed disabled:opacity-50
+      file:border-0 file:bg-transparent file:text-sm file:font-medium
       ${className}
     `}
     {...props}
