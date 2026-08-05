@@ -132,3 +132,9 @@ export * from './monitoring';
 
 // Re-export Sprint 14 Competitor Intelligence Types
 export * from './competitors';
+
+// Re-export Sprint 15 Content Intelligence Types
+export * from './content-intelligence';
+
+// Re-export Sprint 16 Enterprise Types
+export * from './enterprise';

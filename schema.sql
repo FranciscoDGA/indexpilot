@@ -1773,3 +1773,657 @@ CREATE TRIGGER update_competitive_opportunities_updated_at
     BEFORE UPDATE ON competitive_opportunities
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- SPRINT 15: CONTENT INTELLIGENCE & SEMANTIC SEO
+-- ============================================
+
+-- ============================================
+-- CONTENT PROFILES (semantic analysis results)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS content_profiles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workspace_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    url TEXT NOT NULL,
+    title TEXT,
+    semantic_score INTEGER DEFAULT 0 CHECK (semantic_score >= 0 AND semantic_score <= 100),
+    depth_score INTEGER DEFAULT 0 CHECK (depth_score >= 0 AND depth_score <= 100),
+    freshness_score INTEGER DEFAULT 0 CHECK (freshness_score >= 0 AND freshness_score <= 100),
+    intent VARCHAR(50) DEFAULT 'informational' CHECK (intent IN ('informational', 'navigational', 'commercial', 'transacional', 'local')),
+    word_count INTEGER DEFAULT 0,
+    headings_count INTEGER DEFAULT 0,
+    entities_count INTEGER DEFAULT 0,
+    topics_count INTEGER DEFAULT 0,
+    has_faq BOOLEAN DEFAULT FALSE,
+    has_howto BOOLEAN DEFAULT FALSE,
+    internal_links INTEGER DEFAULT 0,
+    external_links INTEGER DEFAULT 0,
+    images_count INTEGER DEFAULT 0,
+    last_analyzed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(workspace_id, url)
+);
+
+-- ============================================
+-- ENTITIES (recognized entities)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS entities (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workspace_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    type VARCHAR(50) NOT NULL CHECK (type IN ('person', 'organization', 'location', 'product', 'concept', 'technology', 'brand', 'event', 'other')),
+    confidence NUMERIC(3,2) DEFAULT 0.5,
+    occurrences INTEGER DEFAULT 1,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(workspace_id, name, type)
+);
+
+-- ============================================
+-- CONTENT-ENTITY RELATIONS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS content_entities (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    content_id UUID NOT NULL REFERENCES content_profiles(id) ON DELETE CASCADE,
+    entity_id UUID NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+    relevance NUMERIC(3,2) DEFAULT 0.5,
+    frequency INTEGER DEFAULT 1,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(content_id, entity_id)
+);
+
+-- ============================================
+-- TOPIC CLUSTERS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS topic_clusters (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workspace_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    pillar_url TEXT,
+    pages_count INTEGER DEFAULT 0,
+    avg_score INTEGER DEFAULT 0,
+    coverage_percentage INTEGER DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'needs_work', 'incomplete')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- CLUSTER PAGES
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS cluster_pages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    cluster_id UUID NOT NULL REFERENCES topic_clusters(id) ON DELETE CASCADE,
+    content_id UUID NOT NULL REFERENCES content_profiles(id) ON DELETE CASCADE,
+    role VARCHAR(50) DEFAULT 'satellite' CHECK (role IN ('pillar', 'satellite', 'supporting')),
+    relevance_score INTEGER DEFAULT 0,
+    internal_links_to_pillar INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(cluster_id, content_id)
+);
+
+-- ============================================
+-- CONTENT GAPS (semantic gaps - different from competitor gaps)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS semantic_gaps (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workspace_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    topic VARCHAR(255) NOT NULL,
+    description TEXT,
+    related_cluster_id UUID REFERENCES topic_clusters(id) ON DELETE SET NULL,
+    priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('high', 'medium', 'low')),
+    status VARCHAR(20) DEFAULT 'identified' CHECK (status IN ('identified', 'in_progress', 'completed', 'ignored')),
+    suggested_angle TEXT,
+    estimated_impact TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- CANNIBALIZATIONS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS cannibalizations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workspace_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    url_a TEXT NOT NULL,
+    url_b TEXT NOT NULL,
+    keyword VARCHAR(255),
+    overlap_score NUMERIC(3,2) DEFAULT 0.0,
+    severity VARCHAR(20) DEFAULT 'low' CHECK (severity IN ('low', 'medium', 'high')),
+    status VARCHAR(20) DEFAULT 'detected' CHECK (status IN ('detected', 'reviewing', 'resolved', 'ignored')),
+    recommendation TEXT,
+    detected_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    resolved_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- CONTENT TOPICS (topics extracted from content)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS content_topics (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    content_id UUID NOT NULL REFERENCES content_profiles(id) ON DELETE CASCADE,
+    topic VARCHAR(255) NOT NULL,
+    relevance NUMERIC(3,2) DEFAULT 0.5,
+    is_primary BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- EDITORIAL PLANS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS editorial_plans (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workspace_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    start_date DATE,
+    end_date DATE,
+    items JSONB DEFAULT '[]',
+    status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'completed', 'archived')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- INDEXES FOR SPRINT 15
+-- ============================================
+
+CREATE INDEX IF NOT EXISTS idx_content_profiles_workspace ON content_profiles(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_content_profiles_url ON content_profiles(url);
+CREATE INDEX IF NOT EXISTS idx_content_profiles_intent ON content_profiles(intent);
+CREATE INDEX IF NOT EXISTS idx_content_profiles_semantic ON content_profiles(semantic_score);
+CREATE INDEX IF NOT EXISTS idx_entities_workspace ON entities(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name);
+CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(type);
+CREATE INDEX IF NOT EXISTS idx_content_entities_content ON content_entities(content_id);
+CREATE INDEX IF NOT EXISTS idx_content_entities_entity ON content_entities(entity_id);
+CREATE INDEX IF NOT EXISTS idx_topic_clusters_workspace ON topic_clusters(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_cluster_pages_cluster ON cluster_pages(cluster_id);
+CREATE INDEX IF NOT EXISTS idx_cluster_pages_content ON cluster_pages(content_id);
+CREATE INDEX IF NOT EXISTS idx_semantic_gaps_workspace ON semantic_gaps(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_semantic_gaps_priority ON semantic_gaps(priority);
+CREATE INDEX IF NOT EXISTS idx_cannibalizations_workspace ON cannibalizations(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_cannibalizations_severity ON cannibalizations(severity);
+CREATE INDEX IF NOT EXISTS idx_content_topics_content ON content_topics(content_id);
+CREATE INDEX IF NOT EXISTS idx_content_topics_topic ON content_topics(topic);
+CREATE INDEX IF NOT EXISTS idx_editorial_plans_workspace ON editorial_plans(workspace_id);
+
+-- ============================================
+-- RLS POLICIES FOR SPRINT 15
+-- ============================================
+
+-- Content Profiles
+CREATE POLICY "Users can view own content profiles"
+    ON content_profiles FOR SELECT
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own content profiles"
+    ON content_profiles FOR ALL
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+-- Entities
+CREATE POLICY "Users can view own entities"
+    ON entities FOR SELECT
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own entities"
+    ON entities FOR ALL
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+-- Content Entities
+CREATE POLICY "Users can view own content entities"
+    ON content_entities FOR SELECT
+    USING (content_id IN (SELECT id FROM content_profiles WHERE workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid())));
+
+CREATE POLICY "Users can manage own content entities"
+    ON content_entities FOR ALL
+    USING (content_id IN (SELECT id FROM content_profiles WHERE workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid())));
+
+-- Topic Clusters
+CREATE POLICY "Users can view own topic clusters"
+    ON topic_clusters FOR SELECT
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own topic clusters"
+    ON topic_clusters FOR ALL
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+-- Cluster Pages
+CREATE POLICY "Users can view own cluster pages"
+    ON cluster_pages FOR SELECT
+    USING (cluster_id IN (SELECT id FROM topic_clusters WHERE workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid())));
+
+CREATE POLICY "Users can manage own cluster pages"
+    ON cluster_pages FOR ALL
+    USING (cluster_id IN (SELECT id FROM topic_clusters WHERE workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid())));
+
+-- Semantic Gaps
+CREATE POLICY "Users can view own semantic gaps"
+    ON semantic_gaps FOR SELECT
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own semantic gaps"
+    ON semantic_gaps FOR ALL
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+-- Cannibalizations
+CREATE POLICY "Users can view own cannibalizations"
+    ON cannibalizations FOR SELECT
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own cannibalizations"
+    ON cannibalizations FOR ALL
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+-- Content Topics
+CREATE POLICY "Users can view own content topics"
+    ON content_topics FOR SELECT
+    USING (content_id IN (SELECT id FROM content_profiles WHERE workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid())));
+
+CREATE POLICY "Users can manage own content topics"
+    ON content_topics FOR ALL
+    USING (content_id IN (SELECT id FROM content_profiles WHERE workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid())));
+
+-- Editorial Plans
+CREATE POLICY "Users can view own editorial plans"
+    ON editorial_plans FOR SELECT
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can manage own editorial plans"
+    ON editorial_plans FOR ALL
+    USING (workspace_id IN (SELECT id FROM sites WHERE user_id = auth.uid()));
+
+-- ============================================
+-- TRIGGERS FOR SPRINT 15
+-- ============================================
+
+CREATE TRIGGER update_content_profiles_updated_at
+    BEFORE UPDATE ON content_profiles
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_topic_clusters_updated_at
+    BEFORE UPDATE ON topic_clusters
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_semantic_gaps_updated_at
+    BEFORE UPDATE ON semantic_gaps
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_editorial_plans_updated_at
+    BEFORE UPDATE ON editorial_plans
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- SPRINT 16: ENTERPRISE SECURITY, MULTI-TENANCY & WHITE LABEL
+-- ============================================
+
+-- ============================================
+-- TENANTS (multi-tenant root)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS tenants (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(100) UNIQUE NOT NULL,
+    plan VARCHAR(50) DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'enterprise', 'custom')),
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'cancelled', 'trial')),
+    trial_ends_at TIMESTAMP WITH TIME ZONE,
+    settings JSONB DEFAULT '{}',
+    limits JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- WORKSPACES (tenant workspaces)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS workspaces (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(100) NOT NULL,
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'archived')),
+    settings JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(tenant_id, slug)
+);
+
+-- ============================================
+-- ROLES (RBAC)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS roles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    permissions JSONB DEFAULT '[]',
+    is_system BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(tenant_id, name)
+);
+
+-- ============================================
+-- USER ROLES (role assignments)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS user_roles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+    granted_by UUID REFERENCES users(id),
+    granted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    expires_at TIMESTAMP WITH TIME ZONE,
+    UNIQUE(user_id, role_id, workspace_id)
+);
+
+-- ============================================
+-- AUDIT LOGS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    action VARCHAR(100) NOT NULL,
+    resource_type VARCHAR(100),
+    resource_id UUID,
+    details JSONB DEFAULT '{}',
+    ip_address INET,
+    user_agent TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- TENANT SETTINGS (branding, limits, features)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS tenant_settings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    category VARCHAR(50) NOT NULL CHECK (category IN ('branding', 'limits', 'security', 'features', 'notifications', 'integrations')),
+    key VARCHAR(100) NOT NULL,
+    value JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(tenant_id, category, key)
+);
+
+-- ============================================
+-- SECRETS MANAGER
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS secrets (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    encrypted_value TEXT NOT NULL,
+    description TEXT,
+    last_rotated_at TIMESTAMP WITH TIME ZONE,
+    expires_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(tenant_id, name)
+);
+
+-- ============================================
+-- FEATURE FLAGS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS feature_flags (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    enabled BOOLEAN DEFAULT FALSE,
+    rollout_percentage INTEGER DEFAULT 100 CHECK (rollout_percentage >= 0 AND rollout_percentage <= 100),
+    target_plans TEXT[] DEFAULT '{}',
+    target_tenants UUID[] DEFAULT '{}',
+    target_users UUID[] DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- WHITE LABEL CONFIGURATIONS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS white_label_configs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    platform_name VARCHAR(255) DEFAULT 'IndexPilot',
+    logo_url TEXT,
+    favicon_url TEXT,
+    primary_color VARCHAR(7) DEFAULT '#3B82F6',
+    secondary_color VARCHAR(7) DEFAULT '#10B981',
+    accent_color VARCHAR(7) DEFAULT '#F59E0B',
+    login_background_url TEXT,
+    email_template_id VARCHAR(100),
+    custom_domain VARCHAR(255),
+    ssl_enabled BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(tenant_id)
+);
+
+-- ============================================
+-- DOMAIN MAPPINGS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS domain_mappings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    domain VARCHAR(255) NOT NULL,
+    ssl_status VARCHAR(20) DEFAULT 'pending' CHECK (ssl_status IN ('pending', 'active', 'expired', 'failed')),
+    ssl_expires_at TIMESTAMP WITH TIME ZONE,
+    verified BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(domain)
+);
+
+-- ============================================
+-- SECURITY SESSIONS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS security_sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    ip_address INET,
+    user_agent TEXT,
+    device_info JSONB DEFAULT '{}',
+    last_active_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    revoked_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- SECURITY ALERTS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS security_alerts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    alert_type VARCHAR(50) NOT NULL CHECK (alert_type IN ('login_suspicious', 'password_changed', 'mfa_disabled', 'api_key_exposed', 'session_hijack', 'brute_force')),
+    severity VARCHAR(20) DEFAULT 'medium' CHECK (severity IN ('low', 'medium', 'high', 'critical')),
+    details JSONB DEFAULT '{}',
+    resolved BOOLEAN DEFAULT FALSE,
+    resolved_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- COMPLIANCE EXPORTS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS compliance_exports (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    export_type VARCHAR(50) NOT NULL CHECK (export_type IN ('data_deletion', 'data_export', 'audit_trail', 'consent_report')),
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+    file_url TEXT,
+    requested_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    completed_at TIMESTAMP WITH TIME ZONE,
+    expires_at TIMESTAMP WITH TIME ZONE
+);
+
+-- ============================================
+-- INDEXES FOR SPRINT 16
+-- ============================================
+
+CREATE INDEX IF NOT EXISTS idx_tenants_slug ON tenants(slug);
+CREATE INDEX IF NOT EXISTS idx_tenants_plan ON tenants(plan);
+CREATE INDEX IF NOT EXISTS idx_tenants_status ON tenants(status);
+CREATE INDEX IF NOT EXISTS idx_workspaces_tenant ON workspaces(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_roles_tenant ON roles(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_user ON user_roles(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles(role_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_workspace ON user_roles(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_tenant ON audit_logs(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs(resource_type, resource_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_settings_tenant ON tenant_settings(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_settings_category ON tenant_settings(category);
+CREATE INDEX IF NOT EXISTS idx_secrets_tenant ON secrets(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_feature_flags_tenant ON feature_flags(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_feature_flags_name ON feature_flags(name);
+CREATE INDEX IF NOT EXISTS idx_white_label_configs_tenant ON white_label_configs(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_domain_mappings_domain ON domain_mappings(domain);
+CREATE INDEX IF NOT EXISTS idx_domain_mappings_tenant ON domain_mappings(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_security_sessions_user ON security_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_security_sessions_tenant ON security_sessions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_security_alerts_tenant ON security_alerts(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_security_alerts_type ON security_alerts(alert_type);
+CREATE INDEX IF NOT EXISTS idx_compliance_exports_tenant ON compliance_exports(tenant_id);
+
+-- ============================================
+-- RLS POLICIES FOR SPRINT 16
+-- ============================================
+
+-- Tenants
+CREATE POLICY "Users can view own tenant"
+    ON tenants FOR SELECT
+    USING (id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- Workspaces
+CREATE POLICY "Users can view own workspaces"
+    ON workspaces FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- Roles
+CREATE POLICY "Users can view own roles"
+    ON roles FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- User Roles
+CREATE POLICY "Users can view own user roles"
+    ON user_roles FOR SELECT
+    USING (user_id = auth.uid());
+
+-- Audit Logs
+CREATE POLICY "Users can view own tenant audit logs"
+    ON audit_logs FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- Tenant Settings
+CREATE POLICY "Users can view own tenant settings"
+    ON tenant_settings FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- Secrets
+CREATE POLICY "Users can view own tenant secrets"
+    ON secrets FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- Feature Flags
+CREATE POLICY "Users can view own tenant feature flags"
+    ON feature_flags FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- White Label Configs
+CREATE POLICY "Users can view own white label config"
+    ON white_label_configs FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- Domain Mappings
+CREATE POLICY "Users can view own domain mappings"
+    ON domain_mappings FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- Security Sessions
+CREATE POLICY "Users can view own security sessions"
+    ON security_sessions FOR SELECT
+    USING (user_id = auth.uid());
+
+-- Security Alerts
+CREATE POLICY "Users can view own security alerts"
+    ON security_alerts FOR SELECT
+    USING (tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()));
+
+-- Compliance Exports
+CREATE POLICY "Users can view own compliance exports"
+    ON compliance_exports FOR SELECT
+    USING (user_id = auth.uid());
+
+-- ============================================
+-- TRIGGERS FOR SPRINT 16
+-- ============================================
+
+CREATE TRIGGER update_tenants_updated_at
+    BEFORE UPDATE ON tenants
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_workspaces_updated_at
+    BEFORE UPDATE ON workspaces
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_roles_updated_at
+    BEFORE UPDATE ON roles
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_tenant_settings_updated_at
+    BEFORE UPDATE ON tenant_settings
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_secrets_updated_at
+    BEFORE UPDATE ON secrets
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_feature_flags_updated_at
+    BEFORE UPDATE ON feature_flags
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_white_label_configs_updated_at
+    BEFORE UPDATE ON white_label_configs
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
